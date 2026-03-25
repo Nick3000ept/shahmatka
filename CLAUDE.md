@@ -41,7 +41,22 @@ git push
 - `script.gs` редактируется здесь, затем копируется в GAS редактор вручную
 - Все изменения только в `index.html` и `script.gs`
 - После правок — коммит + деплой
+- Пользователь не умеет кодить — работает полностью через Claude Code
+- Пользователь описывает задачу словами, Claude сам решает где и что менять
 
-## Автор / аккаунт
-- Netlify: workcacc2025@gmail.com (команда plot)
+## Workflow с пользователем
+1. Пользователь описывает что хочет изменить
+2. Claude вносит правки в нужные файлы
+3. По команде "задеплой" — git commit + push + netlify deploy
+
+## На новом компьютере
+```bash
+git clone https://github.com/Nick3000ept/shahmatka.git
+cd shahmatka
+netlify link --id 1e719907-2772-4c8b-8cd8-2cd888ff41ff
+```
+Netlify CLI должен быть установлен: `npm install -g netlify-cli` + `netlify login`
+
+## Аккаунты
+- Netlify: workcacc2025@gmail.com (команда plot), site ID: `1e719907-2772-4c8b-8cd8-2cd888ff41ff`
 - GitHub: Nick3000ept
