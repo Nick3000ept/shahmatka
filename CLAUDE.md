@@ -83,3 +83,5 @@ Netlify CLI должен быть установлен: `npm install -g netlify-
 ## Аккаунты
 - Netlify: workcacc2025@gmail.com (команда plot), site ID: `1e719907-2772-4c8b-8cd8-2cd888ff41ff`
 - GitHub: Nick3000ept
+- GAS deployment URL: `https://script.google.com/macros/s/AKfycbwBRlgDFkLzGfJngvBczEBLaXMxlr3l4jGai_-ZHw28EVJrogYvxsqnecuZbZS3EJdG/exec`
+- GAS Script ID: `1Hb-7m3iixcoM18qokY-F6qakDTMwJ5usghV7u7IAgAvEv83zi-YN56DY`
