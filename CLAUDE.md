@@ -6,16 +6,15 @@
 - **Хостинг**: Netlify — `https://regal-lebkuchen-9947f5.netlify.app`
 - **Репозиторий**: `https://github.com/Nick3000ept/shahmatka`
 
-## Деплой
+## Деплой (все три команды по запросу "задеплой")
 ```bash
 cd "c:/Users/User/YandexDisk/VS_hub/СБ3_Шахматка"
+# 1. Netlify (фронтенд)
 netlify deploy --dir . --prod
-```
-
-## Git (после изменений)
-```bash
-cd "c:/Users/User/YandexDisk/VS_hub/СБ3_Шахматка"
-git add index.html script.gs
+# 2. Google Apps Script (бэкенд)
+clasp push --force
+# 3. Git
+git add index.html script.gs appsscript.json CLAUDE.md .gitignore
 git commit -m "описание изменений"
 git push
 ```
