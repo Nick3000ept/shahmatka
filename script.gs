@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const SHEET_NAME = 'СБ3_ОБЩАЯ';
+const ADMIN_PASSWORD = 'adminACCB3';
 
 const C = {
   ROW_ID    : 1,
@@ -51,6 +52,11 @@ function doGet(e) {
 
     if (action === 'clearCache') { clearCache(); return jsonOut({ok: true}); }
 
+    if (action === 'checkPassword') {
+      var pwd = p.pwd || '';
+      return jsonOut({ok: pwd === ADMIN_PASSWORD});
+    }
+
     try {
       return HtmlService.createHtmlOutputFromFile('index.html')
         .setTitle('СБ3 · Админ Панель')
@@ -68,8 +74,14 @@ function doPost(e) {
     var body = JSON.parse(e.postData.contents);
 
     if (body.action === 'saveRow') {
-      saveOneRow(body);
-      clearCache();
+      var lock = LockService.getScriptLock();
+      lock.waitLock(15000);
+      try {
+        saveOneRow(body);
+        clearCache();
+      } finally {
+        lock.releaseLock();
+      }
       return jsonOut({ok: true});
     }
 
@@ -79,46 +91,53 @@ function doPost(e) {
       var sheet = findSheet(ss);
       if (!sheet) return jsonOut({error: 'Лист не найден'});
 
-      var lastRow = sheet.getLastRow();
-      if (lastRow < 2) return jsonOut({ok: true, saved: 0});
+      var lock = LockService.getScriptLock();
+      lock.waitLock(15000);
+      try {
+        var lastRow = sheet.getLastRow();
+        if (lastRow < 2) return jsonOut({ok: true, saved: 0});
 
-      var now = new Date();
-      var nowStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd.MM.yyyy');
+        var now = new Date();
+        var nowStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd.MM.yyyy');
 
-      // Читаем A-N (14 столбцов) одним запросом — O+ не трогаем
-      var numCols = 14;
-      var allValues = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
+        // Читаем A-N (14 столбцов) одним запросом — O+ не трогаем
+        // Чтение ВНУТРИ лока: гарантируем что читаем актуальные данные
+        var numCols = 14;
+        var allValues = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
 
-      // Строим карту rowId → индекс в массиве
-      var rowMap = {};
-      allValues.forEach(function(row, i) {
-        var id = String(row[0]).trim();
-        if (id) rowMap[id] = i;
-      });
+        // Строим карту rowId → индекс в массиве
+        var rowMap = {};
+        allValues.forEach(function(row, i) {
+          var id = String(row[0]).trim();
+          if (id) rowMap[id] = i;
+        });
 
-      var changed = false;
-      rows.forEach(function(r) {
-        var idx = rowMap[String(r.rowId)];
-        if (idx === undefined) return;
+        var changed = false;
+        rows.forEach(function(r) {
+          var idx = rowMap[String(r.rowId)];
+          if (idx === undefined) return;
 
-        // Меняем ТОЛЬКО пришедшие поля — остальные остаются как были
-        if (r.status  !== undefined) allValues[idx][C.STATUS   - 1] = r.status  || '';
-        if (r.pct     !== undefined) allValues[idx][C.PCT      - 1] = r.pct     || '';
-        if (r.comment !== undefined) allValues[idx][C.COMMENT  - 1] = r.comment || '';
-        if (r.org     !== undefined) allValues[idx][C.ORG      - 1] = r.org     || '';
-        if (r.dateEnd !== undefined) allValues[idx][C.DATE_END - 1] = parseDate(r.dateEnd) || r.dateEnd || '';
-        if (r.author)                allValues[idx][C.AUTHOR   - 1] = r.author;
-        allValues[idx][C.DATE_CHG - 1] = nowStr;
-        changed = true;
-      });
+          // Меняем ТОЛЬКО пришедшие поля — остальные остаются как были
+          if (r.status  !== undefined) allValues[idx][C.STATUS   - 1] = r.status  || '';
+          if (r.pct     !== undefined) allValues[idx][C.PCT      - 1] = r.pct     || '';
+          if (r.comment !== undefined) allValues[idx][C.COMMENT  - 1] = r.comment || '';
+          if (r.org     !== undefined) allValues[idx][C.ORG      - 1] = r.org     || '';
+          if (r.dateEnd !== undefined) allValues[idx][C.DATE_END - 1] = parseDate(r.dateEnd) || r.dateEnd || '';
+          if (r.author)                allValues[idx][C.AUTHOR   - 1] = r.author;
+          allValues[idx][C.DATE_CHG - 1] = nowStr;
+          changed = true;
+        });
 
-      // Один запрос на запись A-N — O+ не трогаем
-      if (changed) {
-        sheet.getRange(2, 1, allValues.length, numCols).setValues(allValues);
-        SpreadsheetApp.flush();
+        // Один запрос на запись A-N — O+ не трогаем
+        if (changed) {
+          sheet.getRange(2, 1, allValues.length, numCols).setValues(allValues);
+          SpreadsheetApp.flush();
+        }
+
+        clearCache();
+      } finally {
+        lock.releaseLock();
       }
-
-      clearCache();
       return jsonOut({ok: true, saved: rows.length});
     }
 
@@ -210,21 +229,28 @@ function saveOneRow(data) {
   for (var i = 0; i < ids.length; i++) {
     var rowId = String(ids[i][0]).trim();
     if (rowId && rowId === String(data.rowId)) { targetRowSheet = i + 2; break; }
-    if (String(data.rowId).startsWith('row_')) {
-      var synRow = parseInt(String(data.rowId).replace('row_', ''));
-      if (!isNaN(synRow)) { targetRowSheet = synRow; break; }
-    }
+  }
+  // Запасной вариант для синтетических ID (row_N)
+  if (targetRowSheet < 0 && String(data.rowId).startsWith('row_')) {
+    var synRow = parseInt(String(data.rowId).replace('row_', ''));
+    if (!isNaN(synRow)) targetRowSheet = synRow;
   }
   if (targetRowSheet < 0) throw new Error('Строка не найдена: ' + data.rowId);
 
+  // Читаем всю строку A-N одним запросом, меняем нужные поля, пишем обратно
+  var rowValues = sheet.getRange(targetRowSheet, 1, 1, 14).getValues()[0];
   var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy');
-  if (data.status  !== undefined) sheet.getRange(targetRowSheet, C.STATUS).setValue(data.status || '');
-  if (data.dateEnd !== undefined) sheet.getRange(targetRowSheet, C.DATE_END).setValue(parseDate(data.dateEnd) || data.dateEnd || '');
-  if (data.pct     !== undefined) sheet.getRange(targetRowSheet, C.PCT).setValue(data.pct || '');
-  if (data.org     !== undefined) sheet.getRange(targetRowSheet, C.ORG).setValue(data.org || '');
-  if (data.comment !== undefined) sheet.getRange(targetRowSheet, C.COMMENT).setValue(data.comment || '');
-  if (data.author)                sheet.getRange(targetRowSheet, C.AUTHOR).setValue(data.author);
-  sheet.getRange(targetRowSheet, C.DATE_CHG).setValue(nowStr);
+
+  if (data.status  !== undefined) rowValues[C.STATUS   - 1] = data.status  || '';
+  if (data.dateEnd !== undefined) rowValues[C.DATE_END - 1] = parseDate(data.dateEnd) || data.dateEnd || '';
+  if (data.pct     !== undefined) rowValues[C.PCT      - 1] = data.pct     || '';
+  if (data.org     !== undefined) rowValues[C.ORG      - 1] = data.org     || '';
+  if (data.comment !== undefined) rowValues[C.COMMENT  - 1] = data.comment || '';
+  if (data.author)                rowValues[C.AUTHOR   - 1] = data.author;
+  rowValues[C.DATE_CHG - 1] = nowStr;
+
+  sheet.getRange(targetRowSheet, 1, 1, 14).setValues([rowValues]);
+  SpreadsheetApp.flush();
 }
 
 function findSheet(ss) {

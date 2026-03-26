@@ -88,6 +88,20 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);height:100vh;
 .ms-clear{margin-left:auto;padding:3px 9px;border-radius:4px;border:1px solid rgba(220,38,38,.3);background:transparent;color:var(--red);font-size:10px;cursor:pointer;white-space:nowrap;}
 .ms-clear:hover{background:var(--red-bg);}
 
+/* ── CONTRACTOR MODE ── */
+td.cell.not-mine{opacity:.35;cursor:default;}
+
+/* ── PASSWORD MODAL ── */
+.pwd-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center;}
+.pwd-overlay.on{display:flex;}
+.pwd-box{background:var(--bg2);border:1px solid var(--brd2);border-radius:10px;padding:24px;width:300px;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);}
+.pwd-title{font-size:13px;font-weight:600;color:var(--ink);}
+.pwd-sub{font-size:11px;color:var(--ink3);}
+.pwd-inp{padding:7px 10px;border:1px solid var(--brd2);border-radius:var(--r);font-size:12px;font-family:var(--mono);outline:none;color:var(--ink);}
+.pwd-inp:focus{border-color:var(--acc);}
+.pwd-err{font-size:11px;color:var(--red);min-height:14px;}
+.pwd-btns{display:flex;gap:8px;justify-content:flex-end;}
+
 /* ── HINT BAR ── */
 
 /* ── BOARD WRAP ── */
@@ -345,8 +359,6 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     Шахматка факт
   </div>
   <div class="sep"></div>
-  <input class="url-input" id="url-inp" placeholder="https://script.google.com/macros/s/…/exec">
-  <button class="btn btn-pri" onclick="connect()">⚡ Подключить</button>
   <button class="btn" onclick="reload()" title="Обновить">↻</button>
   <div class="sep"></div>
   <div class="sync-dot" id="sdot"></div>
@@ -516,6 +528,19 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   </div>
 </div>
 
+<div class="pwd-overlay" id="pwd-overlay">
+  <div class="pwd-box">
+    <div class="pwd-title">Вход для администратора</div>
+    <div class="pwd-sub">Введите пароль чтобы редактировать данные</div>
+    <input type="password" class="pwd-inp" id="pwd-inp" placeholder="Пароль" onkeydown="if(event.key==='Enter')submitPwd()">
+    <div class="pwd-err" id="pwd-err"></div>
+    <div class="pwd-btns">
+      <button class="btn" onclick="closePwdModal()">Отмена</button>
+      <button class="btn btn-pri" onclick="submitPwd()">Войти</button>
+    </div>
+  </div>
+</div>
+
 <div class="toasts" id="toasts"></div>
 
 <script>
@@ -539,6 +564,10 @@ function applyZoom(){
 
 var BASE='', ROWS=[], MOD={};
 var AUTHOR='';
+// ─── РОЛИ ─────────────────────────────────────────────────────────
+var CONTRACTOR=new URLSearchParams(window.location.search).get('contractor')||'';
+var IS_ADMIN=sessionStorage.getItem('sb3_admin')==='1';
+var _pwdCallback=null;
 // Сегодня в миллисекундах (без времени)
 var _t=new Date(); _t.setHours(0,0,0,0);
 var TODAY_MS=_t.getTime();
@@ -643,14 +672,9 @@ window.onload=function(){
   applyZoom();
   var a=localStorage.getItem('sb3_author')||'';
   if(a){AUTHOR=a;var ai=document.getElementById('author-inp');if(ai)ai.value=a;}
-  var s=localStorage.getItem('sb3_url');
-  if(s){
-    BASE=s;
-    document.getElementById('url-inp').value=s;
-    // Сначала загружаем данные, подрядчиков — после
-    loadData();
-    setTimeout(loadContractors, 1500);
-  }
+  BASE='https://script.google.com/macros/s/AKfycbwBRlgDFkLzGfJngvBczEBLaXMxlr3l4jGai_-ZHw28EVJrogYvxsqnecuZbZS3EJdG/exec';
+  loadData();
+  setTimeout(loadContractors, 1500);
   document.addEventListener('keydown',function(e){
     if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveAll();}
     if(e.key==='Escape'){clearSel();closePanel();}
@@ -666,16 +690,6 @@ window.onload=function(){
   });
 };
 
-function connect(){
-  var v=document.getElementById('url-inp').value.trim();
-  if(!v){toast('Введите URL','err');return;}
-  var m=v.match(/https:\/\/script\.google\.com\/macros\/s\/[^\/\?#]+\/exec/);
-  BASE=m?m[0]:v.split('?')[0];
-  localStorage.setItem('sb3_url',BASE);
-  document.getElementById('url-inp').value=BASE;
-  loadData();
-  setTimeout(loadContractors, 1500);
-}
 
 // ─── CONTRACTORS ──────────────────────────────────────────────────
 var CONTRACTORS=[];
@@ -998,6 +1012,7 @@ function render(){
       pctNum=Math.min(100,Math.max(0,pctNum));
       var isMod=!!mod;
       var isSel=rowId&&SEL.has(rowId);
+      var isNotMine=CONTRACTOR&&!IS_ADMIN&&row&&(row.org||'')!==CONTRACTOR;
       if(!row){
         h+='<td class="cell s-nodata'+(isNewC?' gs':isNewP?' gp':'')+(isFloorSep?' floor-sep':'')+'" tabindex="-1"></td>';
         return;
@@ -1070,7 +1085,7 @@ function render(){
           +(rightFact?'<div style="position:absolute;top:1px;right:2px;font-size:8px;line-height:1;opacity:.75;">📌</div>':'');
       }
 
-      h+='<td class="cell '+s+(isNewC?' gs':isNewP?' gp':'')+(isMod?' modified':'')+(isSel?' sel':'')+(isFloorSep?' floor-sep':'')+'" data-rid="'+e(rowId)+'" onclick="cellClick(event,\''+e(rowId)+'\')">'
+      h+='<td class="cell '+s+(isNewC?' gs':isNewP?' gp':'')+(isMod?' modified':'')+(isSel?' sel':'')+(isFloorSep?' floor-sep':'')+(isNotMine?' not-mine':'')+'" data-rid="'+e(rowId)+'" onclick="cellClick(event,\''+e(rowId)+'\')">'
         +'<div class="ci">'
         +'<div class="c-row">'+cellContent+'</div>'
         +(!SHOW_SP?diffHtml:'')
@@ -1124,6 +1139,19 @@ function renderUnsaved(){
 
 // ─── SELECTION ────────────────────────────────────────────────────
 function cellClick(ev, rowId){
+  if(!IS_ADMIN){
+    var row=ROWS.find(function(r){return r.rowId===rowId;});
+    if(CONTRACTOR){
+      var org=row?(row.org||''):'';
+      if(org!==CONTRACTOR){
+        toast(org?'Эту работу выполняет «'+org+'»':'Подрядчик не назначен','inf');
+        return;
+      }
+    } else {
+      openPwdModal(function(){cellClick(ev,rowId);});
+      return;
+    }
+  }
   if(ev.ctrlKey||ev.metaKey){
     if(SEL.has(rowId)) SEL.delete(rowId);
     else SEL.add(rowId);
@@ -1140,6 +1168,15 @@ function cellClick(ev, rowId){
 
 function toggleRow(fl, ev){
   var rowIds=ROWS.filter(r=>parseFloat(String(r.floor).replace(',','.'))=== fl).map(r=>r.rowId);
+  if(!IS_ADMIN&&CONTRACTOR){
+    var skipped=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')!==CONTRACTOR;});
+    rowIds=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')===CONTRACTOR;});
+    if(skipped.length) toast('Пропущены работы других подрядчиков','inf');
+    if(!rowIds.length) return;
+  } else if(!IS_ADMIN&&!CONTRACTOR){
+    openPwdModal(function(){toggleRow(fl,ev);});
+    return;
+  }
   var allSel=rowIds.every(rid=>SEL.has(rid));
   rowIds.forEach(rid=>{if(allSel) SEL.delete(rid); else SEL.add(rid);});
   closePanel();
@@ -1155,6 +1192,15 @@ function toggleCol(colIdx, ev){
   var col=COL_KEYS[colIdx];
   if(!col) return;
   var rowIds=ROWS.filter(r=>r.corpus===col.corpus&&(r.place||'')===col.place&&(r.lvl2||'')===col.lvl2&&r.work===col.work).map(r=>r.rowId);
+  if(!IS_ADMIN&&CONTRACTOR){
+    var skipped=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')!==CONTRACTOR;});
+    rowIds=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')===CONTRACTOR;});
+    if(skipped.length) toast('Пропущены работы других подрядчиков','inf');
+    if(!rowIds.length) return;
+  } else if(!IS_ADMIN&&!CONTRACTOR){
+    openPwdModal(function(){toggleCol(colIdx,ev);});
+    return;
+  }
   var allSel=rowIds.every(rid=>SEL.has(rid));
   rowIds.forEach(rid=>{if(allSel) SEL.delete(rid); else SEL.add(rid);});
   closePanel();
@@ -1510,6 +1556,39 @@ async function saveAll(){
   var ks=Object.keys(MOD);
   if(!ks.length){toast('Нет изменений','inf');return;}
   await batchSave(ks);
+}
+
+// ─── ROLES / PASSWORD ─────────────────────────────────────────────
+function openPwdModal(callback){
+  _pwdCallback=callback;
+  document.getElementById('pwd-inp').value='';
+  document.getElementById('pwd-err').textContent='';
+  document.getElementById('pwd-overlay').classList.add('on');
+  setTimeout(function(){document.getElementById('pwd-inp').focus();},50);
+}
+function closePwdModal(){
+  document.getElementById('pwd-overlay').classList.remove('on');
+  _pwdCallback=null;
+}
+async function submitPwd(){
+  var pwd=document.getElementById('pwd-inp').value;
+  if(!pwd) return;
+  document.getElementById('pwd-err').textContent='';
+  try{
+    var r=await fetch(BASE+'?action=checkPassword&pwd='+encodeURIComponent(pwd)+'&t='+Date.now());
+    var j=JSON.parse(await r.text());
+    if(j.ok){
+      IS_ADMIN=true;
+      sessionStorage.setItem('sb3_admin','1');
+      closePwdModal();
+      render();
+      if(_pwdCallback){var cb=_pwdCallback;_pwdCallback=null;cb();}
+    } else {
+      document.getElementById('pwd-err').textContent='Неверный пароль';
+    }
+  }catch(ex){
+    document.getElementById('pwd-err').textContent='Ошибка соединения';
+  }
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────
