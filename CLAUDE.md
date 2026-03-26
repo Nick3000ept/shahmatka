@@ -3,22 +3,21 @@
 ## Стек
 - **Frontend**: `index.html` — один файл, чистый HTML/CSS/JS, без фреймворков
 - **Backend**: `script.gs` — Google Apps Script (хранится локально для версионирования, деплоится вручную в GAS редактор)
-- **Хостинг**: Netlify — `https://shahmatka.netlify.app`
+- **Хостинг**: GitHub Pages — `https://nick3000ept.github.io/shahmatka/`
 - **Репозиторий**: `https://github.com/Nick3000ept/shahmatka`
 
 ## Деплой (все команды по запросу "задеплой")
 ```bash
 cd "c:/Users/User/YandexDisk/VS_hub/СБ3_Шахматка"
-# 1. Netlify (фронтенд)
-netlify deploy --dir . --prod
-# 2. Google Apps Script (бэкенд) — сначала пушим код, потом обновляем живой деплой
+# 1. Google Apps Script (бэкенд)
 clasp push --force
 clasp deploy --deploymentId AKfycbwBRlgDFkLzGfJngvBczEBLaXMxlr3l4jGai_-ZHw28EVJrogYvxsqnecuZbZS3EJdG
-# 3. Git
+# 2. Git + GitHub Pages (фронтенд деплоится автоматически после git push)
 git add index.html script.gs appsscript.json CLAUDE.md .gitignore
 git commit -m "описание изменений"
 git push
 ```
+> GitHub Pages публикует автоматически при каждом `git push` в ветку main. Отдельная команда деплоя не нужна.
 
 ## Структура
 ```
