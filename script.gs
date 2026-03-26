@@ -52,6 +52,7 @@ function doGet(e) {
 
     if (action === 'clearCache') { clearCache(); return jsonOut({ok: true}); }
 
+
     if (action === 'checkPassword') {
       var pwd = p.pwd || '';
       return jsonOut({ok: pwd === ADMIN_PASSWORD});
@@ -161,13 +162,15 @@ function getWorkDict() {
   values.forEach(function(row) {
     var name = String(row[2]).trim();
     if (!name) return;
-    dict[name] = {
-      place  : String(row[3]).trim(),
-      lvl1   : String(row[4]).trim(),
-      lvl2   : String(row[5]).trim(),
-      kp     : String(row[9]).trim(),
-      factNum: String(row[10]).trim()
-    };
+    var place   = String(row[3]).trim();
+    var lvl1    = String(row[4]).trim();
+    var lvl2    = String(row[5]).trim();
+    var kp      = String(row[9]).trim();
+    var factNum = String(row[10]).trim();
+    // Не перезаписываем уже заполненную запись пустой (защита от дублей без данных)
+    var existing = dict[name];
+    if (existing && (existing.place || existing.lvl1 || existing.lvl2) && !place && !lvl1 && !lvl2) return;
+    dict[name] = {place: place, lvl1: lvl1, lvl2: lvl2, kp: kp, factNum: factNum};
   });
   _workDict = dict;
   return dict;
