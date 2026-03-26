@@ -3,7 +3,7 @@
 ## Стек
 - **Frontend**: `index.html` — один файл, чистый HTML/CSS/JS, без фреймворков
 - **Backend**: `script.gs` — Google Apps Script (хранится локально для версионирования, деплоится вручную в GAS редактор)
-- **Хостинг**: GitHub Pages — `https://nick3000ept.github.io/shahmatka/`
+- **Хостинг**: GitHub Pages — `https://nick3000ept.github.io/shahmatka/` (репозиторий публичный)
 - **Репозиторий**: `https://github.com/Nick3000ept/shahmatka`
 
 ## Деплой (все команды по запросу "задеплой")
@@ -25,15 +25,23 @@ git push
   index.html   ← вся фронтенд-логика (шахматка, UI, запросы к GAS)
   script.gs    ← Apps Script бэкенд (хранится здесь, деплоится в Google)
   CLAUDE.md    ← этот файл
-  .gitignore   ← исключает .netlify/
+  .gitignore
 ```
 
 ## Google Apps Script
 - Лист данных: `СБ3_ОБЩАЯ`
 - Лист подрядчиков: `Подрядчики`
 - Лист работ: `Факт_работы`
-- Столбцы A–N редактируемые, O+ не трогать никогда
-- URL скрипта вводится пользователем в поле в шапке и сохраняется в localStorage
+- Столбцы A–F содержат dropdown-валидацию — **никогда не записывать**
+- Столбцы G–N — редактируемые (запись только в них)
+- O+ не трогать никогда
+
+## Роли пользователей
+- **Администратор** — вводит пароль `adminACCB3` (проверяется через GAS `checkPassword`), может редактировать все строки
+- **Подрядчик** — открывает ссылку с `?contractor=Название`, редактирует только свои строки (где org совпадает), чужие приглушены (`.not-mine`)
+- **Просмотр** — без пароля и без параметра contractor, только чтение
+
+Ссылка для подрядчика: `https://nick3000ept.github.io/shahmatka/?contractor=Название`
 
 ## Правила безопасности (СТРОГО)
 
@@ -54,7 +62,7 @@ git push
 - НЕ трогать другие проекты в `VS_hub/`
 
 ### Google Sheets — никогда:
-- НЕ добавлять код для записи в столбцы O+
+- НЕ добавлять код для записи в столбцы A–F и O+
 - НЕ удалять строки/листы через скрипт
 - Любые изменения данных только через существующий API (saveRow/saveAll)
 
@@ -71,21 +79,22 @@ git push
 ## Workflow с пользователем
 1. Пользователь описывает что хочет изменить
 2. Claude вносит правки в нужные файлы
-3. По команде "задеплой" — git commit + push + netlify deploy
+3. По команде "задеплой" — clasp push/deploy + git commit + push
 
 ## На новом компьютере
 ```bash
 git clone https://github.com/Nick3000ept/shahmatka.git
 cd shahmatka
-netlify link --id 1e719907-2772-4c8b-8cd8-2cd888ff41ff
+npm install -g @google/clasp netlify-cli
+clasp login   # войти под kuzkin@acons.group
 ```
-Netlify CLI должен быть установлен: `npm install -g netlify-cli` + `netlify login`
 
 ## Аккаунты
-- Netlify: workcacc2025@gmail.com (команда plot), site ID: `1e719907-2772-4c8b-8cd8-2cd888ff41ff`
-- GitHub: Nick3000ept
-- GAS: аккаунт `kuzkin@acons.group`, deployment URL: `https://script.google.com/macros/s/AKfycbwBRlgDFkLzGfJngvBczEBLaXMxlr3l4jGai_-ZHw28EVJrogYvxsqnecuZbZS3EJdG/exec`
+- GitHub: Nick3000ept (репозиторий публичный)
+- GAS: аккаунт `kuzkin@acons.group`
+- GAS deployment URL: `https://script.google.com/macros/s/AKfycbwBRlgDFkLzGfJngvBczEBLaXMxlr3l4jGai_-ZHw28EVJrogYvxsqnecuZbZS3EJdG/exec`
 - GAS Script ID: `1Hb-7m3iixcoM18qokY-F6qakDTMwJ5usghV7u7IAgAvEv83zi-YN56DY`
+- Netlify (архив, больше не используется): workcacc2025@gmail.com, site ID: `1e719907-2772-4c8b-8cd8-2cd888ff41ff`
 
 ---
 
@@ -97,15 +106,16 @@ Netlify CLI должен быть установлен: `npm install -g netlify-
 
 | Метод | action | Что делает |
 |---|---|---|
-| GET | `getRows` | Читает лист СБ3_ОБЩАЯ (столбцы A–P), обогащает данными из Факт_работы, возвращает JSON |
+| GET | `getRows` | Читает СБ3_ОБЩАЯ (A–P), обогащает данными из Факт_работы, возвращает JSON |
 | GET | `getContractors` | Читает лист Подрядчики, столбец A с 2-й строки |
+| GET | `checkPassword` | Сравнивает ?pwd= с ADMIN_PASSWORD, возвращает {ok: bool} |
 | GET | `clearCache` | Сбрасывает CacheService (ключи sb3_rows_*) |
-| POST | `saveRow` | Сохраняет ≤20 строк параллельными одиночными запросами |
-| POST | `saveAll` | Сохраняет >20 строк пакетом |
+| POST | `saveRow` | Сохраняет одну строку (для ≤20 ячеек — параллельные запросы) |
+| POST | `saveAll` | Сохраняет пакет строк с LockService (для >20 ячеек) |
 
 ### Логика saveRow (построчная, для ≤20 ячеек)
 1. Ищет строку по rowId в столбце A
-2. Читает **только G–N** (8 столбцов) — A–F не трогает (там dropdown-валидация Sheets)
+2. Читает **только G–N** (8 столбцов) — A–F не трогает (dropdown-валидация)
 3. Перезаписывает **только пришедшие поля** (status/pct/dateEnd/org/comment)
 4. Дописывает автора (col N) и дату изменения (col M)
 5. Пишет обратно только G–N одним запросом
@@ -125,20 +135,22 @@ Netlify CLI должен быть установлен: `npm install -g netlify-
 - После получения лока **читает уже обновлённые данные** → пишет поверх них
 - Перезапись чужих изменений исключена
 
-`saveAll` делает read-all → modify → write-all, но **чтение происходит внутри лока** — поэтому всегда читаются актуальные данные после предыдущей записи.
+### Логика getWorkDict (обогащение данными из Факт_работы)
+- Читает лист `Факт_работы` (столбцы A–K): ключ = column C (Название), значения = D(place), E(lvl1/Вид работ), F(lvl2/Группа работ), J(kp), K(factNum)
+- **Защита от дублей:** если строка с тем же названием уже есть в словаре с непустыми place/lvl1/lvl2 — новая пустая запись её не перезаписывает
+- Используется в `getRows` для обогащения каждой строки данными о месте/виде/группе работ
 
 ### Поля строки (столбцы A–N)
 ```
 A(1)=rowId  B(2)=corpus  C(3)=floor   D(4)=extra1  E(5)=volume
 F(6)=work   G(7)=org     H(8)=status  I(9)=dateEnd J(10)=dateRecv
 K(11)=pct   L(12)=comment M(13)=dateChg N(14)=author
-O+= не трогать никогда (P(15)=baseDate, Q(16)=currentDate читаются только на чтение)
+O+= не трогать никогда (P(15)=baseDate, Q(16)=currentDate — только чтение)
 ```
 
 ### Фронтенд → бэкенд: что передаётся при сохранении
 Передаются **только изменённые поля** из объекта `MOD[rowId]`. Неизменённые поля не отправляются — бэкенд их не трогает.
 ```js
-// Поля которые могут прийти в saveRow/saveAll:
 { rowId, author, status?, pct?, dateEnd?, comment?, org? }
 ```
 
@@ -146,49 +158,57 @@ O+= не трогать никогда (P(15)=baseDate, Q(16)=currentDate чит
 
 ## Карта функций index.html (для навигации без чтения всего файла)
 
-### Глобальные переменные (строки 538–558)
-- `BASE` — URL GAS-скрипта
+### Глобальные переменные
+- `BASE` — URL GAS-скрипта (из localStorage)
 - `ROWS[]` — все строки из Google Sheets
-- `MOD{}` — несохранённые изменения {rowId: {status, pct, dateEnd, comment, org}}
+- `MOD{}` — несохранённые изменения `{rowId: {status, pct, dateEnd, comment, org}}`
 - `SEL` — Set rowId выбранных ячеек (мультивыбор)
 - `CUR` — текущая строка в одиночном попапе
-- `FC` — Set корпусов для фильтра; `FO` — орг; `FM` — место; `FL2` — уровень; `FW` — Set работ; `FKP` — чекбокс КП
-- `COL_KEYS[]` — порядок столбцов: [{corpus, place, lvl2, work, key, factNum}]
+- `FC` — Set корпусов для фильтра; `FO` — орг; `FM` — место; `FL1` — вид работ; `FL2` — группа работ; `FW` — Set работ; `FKP` — чекбокс КП
+- `COL_KEYS[]` — порядок столбцов: `{corpus, place, lvl2, work, extra1, key, factNum}`
 - `FLOOR_LIST[]` — порядок этажей (по убыванию)
 - `CONTRACTORS[]` — список подрядчиков
 - `WORKS[]` — список видов работ
-- `MS_DRAFT` — черновик мультиредактирования {status, dateEnd, pct}
+- `MS_DRAFT` — черновик мультиредактирования `{status, dateEnd, pct}`
 - `S2CSS{}` / `CSS2S{}` — маппинг статус↔CSS-класс
 - `ZOOM` — текущий масштаб (10–150%)
 - `AUTHOR` — имя пользователя для сохранения
+- `CONTRACTOR` — имя подрядчика из URL-параметра `?contractor=`
+- `IS_ADMIN` — флаг администратора (из sessionStorage после ввода пароля)
 
-### Инициализация (строка 638)
+### Инициализация
 - `window.onload` — восстанавливает zoom/автора из localStorage, загружает данные, вешает хоткеи (Ctrl+S, Esc)
 
-### Масштаб (строки 522–536)
+### Масштаб
 - `changeZoom(delta)` — изменить масштаб на delta%; сохраняет в localStorage
 - `applyZoom()` — применяет CSS zoom к #zoom-wrap
 
-### Автор (строка 544)
+### Автор
 - `saveAuthor(v)` — сохраняет имя автора в AUTHOR и localStorage
 
-### Данные / загрузка (строки 666–725)
+### Данные / загрузка
 - `loadContractors()` — загружает список подрядчиков из GAS, кэширует в localStorage
-- `renderContractorSelect(selected)` — обновляет <select#p-contractor> в попапе
-- `selContractor(name, el)` — выбирает подрядчика по чипу (CUR_CONTRACTOR)
+- `renderContractorSelect(selected)` — обновляет `<select#p-contractor>` в попапе
+- `selContractor(name, el)` — выбирает подрядчика по чипу
 - `reload()` — вызывает loadData()
 - `loadData()` — главная загрузка: fetch getRows → ROWS → buildFilters() → render()
 
-### Фильтры (строки 728–813)
-- `buildFilters()` — строит чипы корпусов + select орг/место/уровень + список работ из ROWS
+### Фильтры
+- `buildFilters()` — строит чипы корпусов + select орг/место/вид работ/группа работ + список работ из ROWS
 - `setCorpus(el, v)` — переключает фильтр корпуса (FC); v='' → все
-- `applyFilters()` — читает значения из DOM → FO/FM/FL2/FKP → render()
+- `applyFilters()` — читает значения из DOM → FO/FM/FL1/FL2/FKP → render()
 - `applyFiltersAndTags()` — то же + обновляет теги фильтров
 - `renderFilterTags()` — рисует плашки активных фильтров под filterbar
 - `clearFilterTag(i)` — сбрасывает i-й тег фильтра
 - `toggleSP(on)` — переключает режим "показывать подрядчика" в ячейках (SHOW_SP)
 
-### Дропдаун работ (строки 560–632)
+### Фильтры в DOM
+- `#forg` — Организация
+- `#fplace` — Место
+- `#flvl1` — Вид работ (Факт_уровень_1 из Факт_работы col E)
+- `#flvl2` — Группа работ (Факт_уровень_2 из Факт_работы col F)
+
+### Дропдаун работ
 - `renderWorkDrop(query)` — перерисовывает список работ с поиском
 - `selWork(w)` — выбрать работу (w='') = сбросить все; обновляет FW
 - `toggleWork(w)` — переключить одну работу в FW
@@ -197,66 +217,72 @@ O+= не трогать никогда (P(15)=baseDate, Q(16)=currentDate чит
 - `workSearchFilter(q)` — фильтрация при вводе в поиск работ
 - `renderDeferred()` — вызывает render() через 150мс дебаунс
 
-### Главный рендер (строки 816–1072)
-- `render()` — ОСНОВНАЯ ФУНКЦИЯ: фильтрует ROWS → строит HTML таблицы (thead 4 строки + tbody) → вставляет в #board; вызывает renderSB/renderUnsaved/updateMsBar
-  - Строит COL_KEYS (уникальные колонки корпус→место→работа)
-  - Строит FLOOR_LIST (этажи по убыванию)
-  - Считает spans для colspan заголовков
-  - В ячейках: отображает статус (цвет), даты базовая/текущая/фактическая, просрочку, отклонение (+Nд), прогресс-бар
-- `statusShort(s)` — CSS-класс → русское название статуса (для SB)
-- `renderSB(rows)` — обновляет счётчики в статусбаре (#sb-total/done/left/start/rem)
+### Главный рендер
+- `render()` — ОСНОВНАЯ ФУНКЦИЯ: фильтрует ROWS → строит HTML таблицы → вставляет в #board
+  - COL_KEYS строится за один O(n) проход по строкам (не вложенные циклы!)
+  - Ключ колонки включает corpus+place+lvl2+work+extra1
+  - При наличии extra1 — 5 строк в thead (доп. строка с группировкой)
+  - Ячейки подрядчика с чужими работами получают класс `.not-mine` (opacity 0.35)
+- `statusShort(s)` — CSS-класс → русское название статуса
+- `renderSB(rows)` — обновляет счётчики в статусбаре
 - `renderUnsaved()` — показывает/скрывает бейдж "N несохр." и кнопку сохранить всё
 
-### Выделение ячеек (строки 1108–1193)
-- `cellClick(ev, rowId)` — клик по ячейке: Ctrl → мультивыбор, обычный → открывает попап
-- `toggleRow(fl, ev)` — клик по номеру этажа: выделяет/снимает всю строку
-- `toggleCol(colIdx, ev)` — клик по заголовку работы: выделяет/снимает весь столбец
+### Выделение ячеек
+- `cellClick(ev, rowId)` — клик по ячейке: Ctrl → мультивыбор, обычный → открывает попап; роль-проверка для подрядчика
+- `toggleRow(fl, ev)` — клик по номеру этажа: выделяет/снимает всю строку; пропускает чужие строки подрядчика
+- `toggleCol(colIdx, ev)` — клик по заголовку работы: выделяет/снимает весь столбец; пропускает чужие строки подрядчика
 - `isRowSelected(fl)` — проверяет, все ли ячейки строки выделены
 - `isColSelected(colIdx)` — проверяет, все ли ячейки столбца выделены
 - `clearSel()` — сбрасывает SEL, обновляет визуал и msbar
 - `updateCellSel()` — синхронизирует CSS-классы sel/row-sel/col-sel с SET SEL
 
-### Мультиредактирование — нижняя панель msbar (строки 1196–1280)
-- `updateMsBar()` — показывает/скрывает #msbar (показывается при SEL.size > 1)
-- `resetMsDraft()` — сбрасывает MS_DRAFT и все контролы в msbar
-- `msDraftStatus(s)` — устанавливает статус в черновик; автосвязь: done/accepted → 100%
+### Пароль администратора
+- `openPwdModal(callback)` — показывает модальное окно ввода пароля
+- `closePwdModal()` — скрывает модальное окно
+- `submitPwd()` — отправляет пароль в GAS checkPassword, при успехе ставит IS_ADMIN=true в sessionStorage
+
+### Мультиредактирование — нижняя панель msbar
+- `updateMsBar()` — показывает/скрывает #msbar (при SEL.size > 1)
+- `resetMsDraft()` — сбрасывает MS_DRAFT и контролы msbar
+- `msDraftStatus(s)` — статус в черновик; автосвязь: done/accepted → 100%
 - `msPctUpd(v)` — слайдер % изменился; автосвязь: 100% → done
 - `msPctResetToggle(checked)` — чекбокс "сбросить %" (блокирует слайдер)
 - `msUpdatePreview()` — обновляет превью тегов в msbar
-- `msCommit()` — применяет MS_DRAFT ко всем ячейкам SEL → MOD, сбрасывает черновик
+- `msCommit()` — применяет MS_DRAFT ко всем ячейкам SEL → MOD
 
-### Попап одиночного редактирования (строки 1282–1416)
-- `openPanel(rowId, anchorEl)` — открывает попап: заполняет статус/дату/% /комментарий/подрядчик из ROWS[rowId] или MOD[rowId]
+### Попап одиночного редактирования
+- `openPanel(rowId, anchorEl)` — открывает попап: заполняет статус/дату/%/комментарий/подрядчик
 - `positionPopover(anchor)` — позиционирует #popover рядом с anchorEl, не выходя за экран
 - `closePanel()` — скрывает попап, CUR=null
-- `selSt(s)` — выбрать статус в попапе (CUR_ST); автосвязь: done/accepted → 100%
-- `selStMixed()` — режим "mixed" когда у выбранных ячеек разные статусы
-- `updPct(v)` — слайдер % в попапе изменился; автосвязь: 100% → done
-- `setPct(v)` — установить % программно (при смене статуса)
+- `selSt(s)` — выбрать статус; автосвязь: done/accepted → 100%
+- `selStMixed()` — режим "mixed" при разных статусах у выбранных ячеек
+- `updPct(v)` — слайдер % изменился; автосвязь: 100% → done
+- `setPct(v)` — установить % программно
 - `savePanel()` — читает поля попапа → пишет в MOD для всех rowId из SEL (или CUR)
 
-### Сохранение в Google Sheets (строки 1418–1496)
+### Сохранение в Google Sheets
 - `updateSaveBtn()` — показывает/скрывает кнопку "Сохранить всё" и бейдж
-- `batchSave(rowIds)` — отправляет изменения из MOD в GAS: ≤20 строк → параллельные saveRow, >20 → saveAll; обновляет ROWS, чистит MOD
+- `batchSave(rowIds)` — отправляет изменения из MOD в GAS: ≤20 строк → параллельные saveRow, >20 → saveAll
 - `saveAll()` — проверяет AUTHOR, берёт все ключи MOD → batchSave
 
-### Утилиты (строки 1498–1529)
+### Утилиты
 - `parseDateMs(s)` — "дд.мм.гггг" → timestamp ms
-- `fmtDateMs(ms)` — timestamp ms → "дд.мм" (без года, для заголовков)
-- `fmtDate(d)` — любой формат даты → "дд.мм.гггг"
-- `toIso(d)` — "дд.мм.гггг" → "гггг-мм-дд" (для input type=date)
-- `setSt(st, txt)` — обновляет индикатор синхронизации (#sdot / #stxt): 'ok'|'err'|'spin'
-- `showLoader(txt)` / `hideLoader()` — показывает/скрывает оверлей загрузки
-- `toast(msg, tp, dur)` — всплывающее уведомление: tp='ok'|'err'|'inf'
+- `fmtDateMs(ms)` — timestamp ms → "дд.мм"
+- `fmtDate(d)` — любой формат → "дд.мм.гггг"
+- `toIso(d)` — "дд.мм.гггг" → "гггг-мм-дд"
+- `setSt(st, txt)` — индикатор синхронизации: 'ok'|'err'|'spin'
+- `showLoader(txt)` / `hideLoader()` — оверлей загрузки
+- `toast(msg, tp, dur)` — уведомление: tp='ok'|'err'|'inf'
 - `e(s)` — HTML-экранирование строки
 
 ### Ключевые ID элементов DOM
-- `#board` — таблица шахматки (`<table>`)
+- `#board` — таблица шахматки
 - `#empty` — заглушка "нет данных"
 - `#popover` — попап одиночного редактирования
+- `#pwd-overlay` — модальное окно пароля
 - `#msbar` — нижняя панель мультиредактирования
 - `#fc` — контейнер чипов корпусов
-- `#forg` / `#fplace` / `#flvl2` — select-фильтры
+- `#forg` / `#fplace` / `#flvl1` / `#flvl2` — select-фильтры
 - `#work-search-inp` / `#work-drop` / `#work-tags` — поле+дропдаун+теги работ
 - `#filter-tags-bar` / `#filter-tags-list` — бар активных тегов фильтров
 - `#pct-sl` / `#pct-val` — слайдер % в попапе
