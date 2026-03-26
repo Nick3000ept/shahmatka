@@ -196,6 +196,7 @@ function getRows(filterCorpus) {
       corpus     : corpus,
       floor      : parseFloor(floor),
       work       : work,
+      extra1     : String(row[3]).trim(),
       org        : String(row[6]).trim(),
       status     : String(row[7]).trim(),
       dateEnd    : formatDateOut(row[8]),

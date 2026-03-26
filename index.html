@@ -151,6 +151,9 @@ th.h-work:hover{color:var(--acc);}
 th.h-work.gs{border-left:3px solid #1a1d24;}
 th.h-work.gp{border-left:2px solid #4b5563;}
 th.h-work.col-sel{background:rgba(79,142,247,.08);color:var(--acc);}
+th.h-work-grp{background:var(--bg3);font-size:10px;font-weight:700;color:var(--ink);text-align:center;padding:3px 4px;border-bottom:1px solid var(--brd2);border-right:1px solid var(--brd);white-space:normal;word-break:break-word;line-height:1.2;vertical-align:middle;height:36px;}
+th.h-work-grp.gs{border-left:3px solid #1a1d24;}
+th.h-work-grp.gp{border-left:2px solid #4b5563;}
 th.h-maxdate{background:#eef3ff;font-family:var(--mono);font-size:10px;font-weight:700;color:#3b5fb5;text-align:center;padding:2px 4px;border-bottom:2px solid var(--brd2);border-right:1px solid var(--brd);white-space:nowrap;height:18px;}
 th.h-maxdate.gs{border-left:3px solid #1a1d24;}
 th.h-maxdate.gp{border-left:2px solid #4b5563;}
@@ -867,11 +870,12 @@ function render(){
 
   FLOOR_LIST=[...new Set(rows.map(r=>parseFloat(String(r.floor).replace(',','.'))))].filter(n=>!isNaN(n)).sort((a,b)=>b-a);
 
-  // Уникальные комбинации corpus|place|lvl2|work в правильном порядке
+  // Уникальные комбинации corpus|place|lvl2|work|extra1 в правильном порядке
   var corps=[...new Set(rows.map(r=>r.corpus))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));
   var places=[...new Set(rows.map(r=>r.place||''))];
   var lvl2s=[...new Set(rows.map(r=>r.lvl2||''))];
   var works=[...new Set(rows.map(r=>r.work).filter(Boolean))];
+  var extra1s=[...new Set(rows.map(r=>r.extra1||''))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));
 
   COL_KEYS=[];
   var colSet={};
@@ -879,16 +883,17 @@ function render(){
     places.forEach(place=>{
       lvl2s.forEach(lvl2=>{
         works.forEach(work=>{
-          if(rows.some(r=>r.corpus===corp&&(r.place||'')=== place&&(r.lvl2||'')===lvl2&&r.work===work)){
-            var ck=corp+'|||'+(place||'')+'|||'+(lvl2||'')+'|||'+work;
-            if(!colSet[ck]){
-              // Берём factNum из первой строки с этой комбинацией
-              var sample=rows.find(r=>r.corpus===corp&&(r.place||'')===place&&(r.lvl2||'')===lvl2&&r.work===work);
-              var fn=sample?parseFloat(String(sample.factNum||'').replace(',','.'))||9999:9999;
-              COL_KEYS.push({corpus:corp,place:place||'',lvl2:lvl2||'',work:work,key:ck,factNum:fn});
-              colSet[ck]=true;
+          extra1s.forEach(extra1=>{
+            if(rows.some(r=>r.corpus===corp&&(r.place||'')=== place&&(r.lvl2||'')===lvl2&&r.work===work&&(r.extra1||'')===extra1)){
+              var ck=corp+'|||'+(place||'')+'|||'+(lvl2||'')+'|||'+work+'|||'+extra1;
+              if(!colSet[ck]){
+                var sample=rows.find(r=>r.corpus===corp&&(r.place||'')===place&&(r.lvl2||'')===lvl2&&r.work===work&&(r.extra1||'')===extra1);
+                var fn=sample?parseFloat(String(sample.factNum||'').replace(',','.'))||9999:9999;
+                COL_KEYS.push({corpus:corp,place:place||'',lvl2:lvl2||'',work:work,extra1:extra1,key:ck,factNum:fn});
+                colSet[ck]=true;
+              }
             }
-          }
+          });
         });
       });
     });
@@ -901,30 +906,33 @@ function render(){
     if(cc!==0) return cc;
     var po=(PLACE_ORDER[a.place]||99)-(PLACE_ORDER[b.place]||99);
     if(po!==0) return po;
-    return a.factNum-b.factNum;
+    if(a.factNum!==b.factNum) return a.factNum-b.factNum;
+    return (a.extra1||'').localeCompare(b.extra1||'',undefined,{numeric:true,sensitivity:'base'});
   });
 
   // Индекс
   var idx={};
   rows.forEach(r=>{
     var fl=parseFloat(String(r.floor).replace(',','.'));
-    idx[fl+'|||'+r.corpus+'|||'+(r.place||'')+'|||'+(r.lvl2||'')+'|||'+r.work]=r;
+    idx[fl+'|||'+r.corpus+'|||'+(r.place||'')+'|||'+(r.lvl2||'')+'|||'+r.work+'|||'+(r.extra1||'')]=r;
   });
 
   // Считаем spans
-  var corpSpans={}, placeSpans={}, lvl2Spans={};
+  var corpSpans={}, placeSpans={}, lvl2Spans={}, workSpans={};
   COL_KEYS.forEach(c=>{
     var ck=c.corpus; corpSpans[ck]=(corpSpans[ck]||0)+1;
     var pk=c.corpus+'|'+c.place; placeSpans[pk]=(placeSpans[pk]||0)+1;
     var lk=c.corpus+'|'+c.place+'|'+c.lvl2; lvl2Spans[lk]=(lvl2Spans[lk]||0)+1;
+    var wk=c.corpus+'|'+c.place+'|'+c.lvl2+'|'+c.work; workSpans[wk]=(workSpans[wk]||0)+1;
   });
+  var hasExtra1=COL_KEYS.some(c=>c.extra1);
 
   // Считаем макс базовую дату по каждой колонке и по каждому корпусу
   var maxDateByCol={};  // key → макс дата
   var maxDateByCorpus={}; // corpus → макс дата
   COL_KEYS.forEach(c=>{
     rows.forEach(r=>{
-      if(r.corpus===c.corpus&&r.place===c.place&&(r.lvl2||'')===c.lvl2&&r.work===c.work&&r.baseDate){
+      if(r.corpus===c.corpus&&r.place===c.place&&(r.lvl2||'')===c.lvl2&&r.work===c.work&&(r.extra1||'')===c.extra1&&r.baseDate){
         var d=parseDateMs(r.baseDate);
         if(d){
           if(!maxDateByCol[c.key]||d>maxDateByCol[c.key]) maxDateByCol[c.key]=d;
@@ -934,9 +942,9 @@ function render(){
     });
   });
 
-  // THEAD — 4 уровня: Корпус(+макс дата) → Место → Работа → Макс базовая дата
+  // THEAD — 4 или 5 уровней: Корпус → Место → Работа (→ Доп.признак) → Макс дата
   var h='<thead>';
-  h+='<tr><th class="corner" rowspan="4"><div class="corner-lbl">Этаж</div></th>';
+  h+='<tr><th class="corner" rowspan="'+(hasExtra1?5:4)+'"><div class="corner-lbl">Этаж</div></th>';
   var addedC={};
   COL_KEYS.forEach((c,i)=>{
     if(!addedC[c.corpus]){
@@ -965,16 +973,40 @@ function render(){
   });
   h+='</tr>';
 
-  // Строка 3: Работа
+  // Строка 3: Работа (без extra1 — одна колонка; с extra1 — colspan по кол-ву подколонок)
   h+='<tr>';
-  COL_KEYS.forEach((c,i)=>{
-    var isNewC=i===0||COL_KEYS[i-1].corpus!==c.corpus;
-    var isNewP=!isNewC&&(i===0||COL_KEYS[i-1].place!==c.place);
-    h+='<th class="h-work'+(isNewC?' gs':isNewP?' gp':'')+(isColSelected(i)?' col-sel':'')+'" data-colidx="'+i+'" onclick="toggleCol('+i+',event)">'+e(c.work)+'</th>';
-  });
+  if(hasExtra1){
+    var addedW={};
+    COL_KEYS.forEach((c,i)=>{
+      var wk=c.corpus+'|'+c.place+'|'+c.lvl2+'|'+c.work;
+      if(!addedW[wk]){
+        var isNewC=i===0||COL_KEYS[i-1].corpus!==c.corpus;
+        var isNewP=!isNewC&&(i===0||COL_KEYS[i-1].place!==c.place);
+        h+='<th class="h-work-grp'+(isNewC?' gs':isNewP?' gp':'')+'" colspan="'+workSpans[wk]+'">'+e(c.work)+'</th>';
+        addedW[wk]=true;
+      }
+    });
+  } else {
+    COL_KEYS.forEach((c,i)=>{
+      var isNewC=i===0||COL_KEYS[i-1].corpus!==c.corpus;
+      var isNewP=!isNewC&&(i===0||COL_KEYS[i-1].place!==c.place);
+      h+='<th class="h-work'+(isNewC?' gs':isNewP?' gp':'')+(isColSelected(i)?' col-sel':'')+'" data-colidx="'+i+'" onclick="toggleCol('+i+',event)">'+e(c.work)+'</th>';
+    });
+  }
   h+='</tr>';
 
-  // Строка 4: Макс базовая дата по работе
+  // Строка 4 (только если hasExtra1): Доп.признак №1
+  if(hasExtra1){
+    h+='<tr>';
+    COL_KEYS.forEach((c,i)=>{
+      var isNewC=i===0||COL_KEYS[i-1].corpus!==c.corpus;
+      var isNewP=!isNewC&&(COL_KEYS[i-1].corpus+'|'+COL_KEYS[i-1].place)!==(c.corpus+'|'+c.place);
+      h+='<th class="h-work'+(isNewC?' gs':isNewP?' gp':'')+(isColSelected(i)?' col-sel':'')+'" data-colidx="'+i+'" onclick="toggleCol('+i+',event)">'+e(c.extra1||'')+'</th>';
+    });
+    h+='</tr>';
+  }
+
+  // Строка 4/5: Макс базовая дата по колонке
   h+='<tr>';
   COL_KEYS.forEach((c,i)=>{
     var isNewC=i===0||COL_KEYS[i-1].corpus!==c.corpus;
@@ -994,7 +1026,7 @@ function render(){
     COL_KEYS.forEach((c,i)=>{
       var isNewC=i===0||COL_KEYS[i-1].corpus!==c.corpus;
       var isNewP=!isNewC&&(i===0||COL_KEYS[i-1].place!==c.place);
-      var k=fl+'|||'+c.corpus+'|||'+c.place+'|||'+c.lvl2+'|||'+c.work;
+      var k=fl+'|||'+c.corpus+'|||'+c.place+'|||'+c.lvl2+'|||'+c.work+'|||'+c.extra1;
       var row=idx[k];
       var rowId=row?row.rowId:null;
       var mod=rowId?MOD[rowId]:null;
@@ -1191,7 +1223,7 @@ function toggleRow(fl, ev){
 function toggleCol(colIdx, ev){
   var col=COL_KEYS[colIdx];
   if(!col) return;
-  var rowIds=ROWS.filter(r=>r.corpus===col.corpus&&(r.place||'')===col.place&&(r.lvl2||'')===col.lvl2&&r.work===col.work).map(r=>r.rowId);
+  var rowIds=ROWS.filter(r=>r.corpus===col.corpus&&(r.place||'')===col.place&&(r.lvl2||'')===col.lvl2&&r.work===col.work&&(r.extra1||'')===col.extra1).map(r=>r.rowId);
   if(!IS_ADMIN&&CONTRACTOR){
     var skipped=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')!==CONTRACTOR;});
     rowIds=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')===CONTRACTOR;});
@@ -1217,7 +1249,7 @@ function isRowSelected(fl){
 }
 function isColSelected(colIdx){
   var col=COL_KEYS[colIdx]; if(!col) return false;
-  var rowIds=ROWS.filter(r=>r.corpus===col.corpus&&(r.place||'')===col.place&&(r.lvl2||'')===col.lvl2&&r.work===col.work).map(r=>r.rowId);
+  var rowIds=ROWS.filter(r=>r.corpus===col.corpus&&(r.place||'')===col.place&&(r.lvl2||'')===col.lvl2&&r.work===col.work&&(r.extra1||'')===col.extra1).map(r=>r.rowId);
   return rowIds.length&&rowIds.every(rid=>SEL.has(rid));
 }
 
