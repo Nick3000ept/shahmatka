@@ -391,7 +391,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <span class="fl">Место:</span>
   <select class="fsel" id="fplace" onchange="applyFiltersAndTags()"><option value="">Все</option></select>
   <div class="fsep"></div>
-  <span class="fl">Уровень:</span>
+  <span class="fl">Группа работ:</span>
   <select class="fsel" id="flvl2" onchange="applyFiltersAndTags()"><option value="">Все</option></select>
   <div class="fsep"></div>
   <span class="fl">Вид работ:</span>
@@ -785,7 +785,7 @@ function buildFilters(){
 
   var lvl2s=[...new Set(ROWS.map(r=>r.lvl2).filter(Boolean))].sort();
   var ls=document.getElementById('flvl2');
-  ls.innerHTML='<option value="">Все уровни</option>';
+  ls.innerHTML='<option value="">Все группы</option>';
   lvl2s.forEach(l=>ls.innerHTML+='<option value="'+e(l)+'">'+e(l)+'</option>');
 
   var works=[...new Set(ROWS.map(r=>r.work).filter(Boolean))].sort();
@@ -837,7 +837,7 @@ function renderFilterTags(){
   if(FO) tags.push({label:'Орг: '+FO, clear:function(){document.getElementById('forg').value='';FO='';applyFiltersAndTags();}});
   if(FM) tags.push({label:'Место: '+FM, clear:function(){document.getElementById('fplace').value='';FM='';applyFiltersAndTags();}});
   if(FL1) tags.push({label:'Вид: '+FL1, clear:function(){document.getElementById('flvl1').value='';FL1='';applyFiltersAndTags();}});
-  if(FL2) tags.push({label:'Уровень: '+FL2, clear:function(){document.getElementById('flvl2').value='';FL2='';applyFiltersAndTags();}});
+  if(FL2) tags.push({label:'Группа работ: '+FL2, clear:function(){document.getElementById('flvl2').value='';FL2='';applyFiltersAndTags();}});
   var bar=document.getElementById('filter-tags-bar');
   var list=document.getElementById('filter-tags-list');
   if(!tags.length&&FW.size===0){bar.style.display='none';return;}
