@@ -113,7 +113,7 @@ function doPost(e) {
 
         // Смещение: индекс в allValues = C.X - EDIT_START
         var off = EDIT_START; // 7
-        var changed = false;
+        var changedIndices = [];
         rows.forEach(function(r) {
           var idx = rowMap[String(r.rowId)];
           if (idx === undefined) return;
@@ -126,12 +126,20 @@ function doPost(e) {
           if (r.dateEnd !== undefined) allValues[idx][C.DATE_END - off] = parseDate(r.dateEnd) || r.dateEnd || '';
           if (r.author)                allValues[idx][C.AUTHOR   - off] = r.author;
           allValues[idx][C.DATE_CHG   - off] = nowStr;
-          changed = true;
+          changedIndices.push(idx);
         });
 
-        // Один запрос на запись G-N — A-F не трогаем
-        if (changed) {
-          sheet.getRange(2, EDIT_START, allValues.length, EDIT_COLS).setValues(allValues);
+        // Пишем ТОЛЬКО изменённые строки — не трогаем остальные (избегаем ошибок валидации)
+        // G может иметь dropdown-валидацию: при ошибке fallback на H-N
+        if (changedIndices.length > 0) {
+          changedIndices.forEach(function(idx) {
+            try {
+              sheet.getRange(idx + 2, EDIT_START, 1, EDIT_COLS).setValues([allValues[idx]]);
+            } catch(e) {
+              // G (org) вызвал ошибку валидации — пишем только H-N
+              sheet.getRange(idx + 2, 8, 1, 7).setValues([allValues[idx].slice(1)]);
+            }
+          });
           SpreadsheetApp.flush();
         }
 
@@ -258,7 +266,12 @@ function saveOneRow(data) {
   if (data.author)                rowValues[C.AUTHOR   - off] = data.author;
   rowValues[C.DATE_CHG - off] = nowStr;
 
-  sheet.getRange(targetRowSheet, EDIT_START, 1, EDIT_COLS).setValues([rowValues]);
+  // G (org) может иметь dropdown-валидацию: при ошибке fallback на H-N
+  try {
+    sheet.getRange(targetRowSheet, EDIT_START, 1, EDIT_COLS).setValues([rowValues]);
+  } catch(e) {
+    sheet.getRange(targetRowSheet, 8, 1, 7).setValues([rowValues.slice(1)]);
+  }
   SpreadsheetApp.flush();
 }
 
