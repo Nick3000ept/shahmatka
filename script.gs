@@ -74,14 +74,8 @@ function doPost(e) {
     var body = JSON.parse(e.postData.contents);
 
     if (body.action === 'saveRow') {
-      var lock = LockService.getScriptLock();
-      lock.waitLock(15000);
-      try {
-        saveOneRow(body);
-        clearCache();
-      } finally {
-        lock.releaseLock();
-      }
+      saveOneRow(body);
+      clearCache();
       return jsonOut({ok: true});
     }
 
