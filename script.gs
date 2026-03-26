@@ -94,37 +94,43 @@ function doPost(e) {
         var now = new Date();
         var nowStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd.MM.yyyy');
 
-        // Читаем A-N (14 столбцов) одним запросом — O+ не трогаем
-        // Чтение ВНУТРИ лока: гарантируем что читаем актуальные данные
-        var numCols = 14;
-        var allValues = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
+        // Читаем rowId (столбец A) отдельно — для построения карты
+        var idValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+
+        // Читаем только G-N (7 столбцов: org/status/dateEnd/dateRecv/pct/comment/dateChg/author)
+        // A-F не трогаем — там dropdown-валидация, запись вызовет ошибку
+        var EDIT_START = 7; // столбец G
+        var EDIT_COLS  = 8; // G..N
+        var allValues = sheet.getRange(2, EDIT_START, lastRow - 1, EDIT_COLS).getValues();
 
         // Строим карту rowId → индекс в массиве
         var rowMap = {};
-        allValues.forEach(function(row, i) {
+        idValues.forEach(function(row, i) {
           var id = String(row[0]).trim();
           if (id) rowMap[id] = i;
         });
 
+        // Смещение: индекс в allValues = C.X - EDIT_START
+        var off = EDIT_START; // 7
         var changed = false;
         rows.forEach(function(r) {
           var idx = rowMap[String(r.rowId)];
           if (idx === undefined) return;
 
           // Меняем ТОЛЬКО пришедшие поля — остальные остаются как были
-          if (r.status  !== undefined) allValues[idx][C.STATUS   - 1] = r.status  || '';
-          if (r.pct     !== undefined) allValues[idx][C.PCT      - 1] = r.pct     || '';
-          if (r.comment !== undefined) allValues[idx][C.COMMENT  - 1] = r.comment || '';
-          if (r.org     !== undefined) allValues[idx][C.ORG      - 1] = r.org     || '';
-          if (r.dateEnd !== undefined) allValues[idx][C.DATE_END - 1] = parseDate(r.dateEnd) || r.dateEnd || '';
-          if (r.author)                allValues[idx][C.AUTHOR   - 1] = r.author;
-          allValues[idx][C.DATE_CHG - 1] = nowStr;
+          if (r.status  !== undefined) allValues[idx][C.STATUS   - off] = r.status  || '';
+          if (r.pct     !== undefined) allValues[idx][C.PCT      - off] = r.pct     || '';
+          if (r.comment !== undefined) allValues[idx][C.COMMENT  - off] = r.comment || '';
+          if (r.org     !== undefined) allValues[idx][C.ORG      - off] = r.org     || '';
+          if (r.dateEnd !== undefined) allValues[idx][C.DATE_END - off] = parseDate(r.dateEnd) || r.dateEnd || '';
+          if (r.author)                allValues[idx][C.AUTHOR   - off] = r.author;
+          allValues[idx][C.DATE_CHG   - off] = nowStr;
           changed = true;
         });
 
-        // Один запрос на запись A-N — O+ не трогаем
+        // Один запрос на запись G-N — A-F не трогаем
         if (changed) {
-          sheet.getRange(2, 1, allValues.length, numCols).setValues(allValues);
+          sheet.getRange(2, EDIT_START, allValues.length, EDIT_COLS).setValues(allValues);
           SpreadsheetApp.flush();
         }
 
@@ -233,19 +239,23 @@ function saveOneRow(data) {
   }
   if (targetRowSheet < 0) throw new Error('Строка не найдена: ' + data.rowId);
 
-  // Читаем всю строку A-N одним запросом, меняем нужные поля, пишем обратно
-  var rowValues = sheet.getRange(targetRowSheet, 1, 1, 14).getValues()[0];
+  // Читаем только G-N (org/status/dateEnd/dateRecv/pct/comment/dateChg/author)
+  // A-F не трогаем — там dropdown-валидация, запись вызовет ошибку
+  var EDIT_START = 7; // столбец G
+  var EDIT_COLS  = 8; // G..N
+  var rowValues = sheet.getRange(targetRowSheet, EDIT_START, 1, EDIT_COLS).getValues()[0];
   var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy');
 
-  if (data.status  !== undefined) rowValues[C.STATUS   - 1] = data.status  || '';
-  if (data.dateEnd !== undefined) rowValues[C.DATE_END - 1] = parseDate(data.dateEnd) || data.dateEnd || '';
-  if (data.pct     !== undefined) rowValues[C.PCT      - 1] = data.pct     || '';
-  if (data.org     !== undefined) rowValues[C.ORG      - 1] = data.org     || '';
-  if (data.comment !== undefined) rowValues[C.COMMENT  - 1] = data.comment || '';
-  if (data.author)                rowValues[C.AUTHOR   - 1] = data.author;
-  rowValues[C.DATE_CHG - 1] = nowStr;
+  var off = EDIT_START; // 7 — смещение: индекс в rowValues = C.X - off
+  if (data.status  !== undefined) rowValues[C.STATUS   - off] = data.status  || '';
+  if (data.dateEnd !== undefined) rowValues[C.DATE_END - off] = parseDate(data.dateEnd) || data.dateEnd || '';
+  if (data.pct     !== undefined) rowValues[C.PCT      - off] = data.pct     || '';
+  if (data.org     !== undefined) rowValues[C.ORG      - off] = data.org     || '';
+  if (data.comment !== undefined) rowValues[C.COMMENT  - off] = data.comment || '';
+  if (data.author)                rowValues[C.AUTHOR   - off] = data.author;
+  rowValues[C.DATE_CHG - off] = nowStr;
 
-  sheet.getRange(targetRowSheet, 1, 1, 14).setValues([rowValues]);
+  sheet.getRange(targetRowSheet, EDIT_START, 1, EDIT_COLS).setValues([rowValues]);
   SpreadsheetApp.flush();
 }
 
