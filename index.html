@@ -394,6 +394,9 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <span class="fl">Уровень:</span>
   <select class="fsel" id="flvl2" onchange="applyFiltersAndTags()"><option value="">Все</option></select>
   <div class="fsep"></div>
+  <span class="fl">Вид работ:</span>
+  <select class="fsel" id="flvl1" onchange="applyFiltersAndTags()"><option value="">Все виды</option></select>
+  <div class="fsep"></div>
   <span class="fl">Работа:</span>
   <div class="work-search-wrap" id="work-search-wrap" onmousedown="event.stopPropagation()">
     <input class="work-search-inp" id="work-search-inp" placeholder="Поиск работ…" autocomplete="off"
@@ -588,7 +591,7 @@ var _pctTouched = false; // был ли слайдер процентов тро
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = []; // порядок строк
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL2='', FKP=false, SHOW_SP=false;
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false;
 var WORKS=[];
 
 function renderWorkDrop(query){
@@ -775,6 +778,11 @@ function buildFilters(){
   ps.innerHTML='<option value="">Все места</option>';
   places.forEach(p=>ps.innerHTML+='<option value="'+e(p)+'">'+e(p)+'</option>');
 
+  var lvl1s=[...new Set(ROWS.map(r=>r.lvl1).filter(Boolean))].sort();
+  var l1s=document.getElementById('flvl1');
+  l1s.innerHTML='<option value="">Все виды</option>';
+  lvl1s.forEach(l=>l1s.innerHTML+='<option value="'+e(l)+'">'+e(l)+'</option>');
+
   var lvl2s=[...new Set(ROWS.map(r=>r.lvl2).filter(Boolean))].sort();
   var ls=document.getElementById('flvl2');
   ls.innerHTML='<option value="">Все уровни</option>';
@@ -808,6 +816,7 @@ function setCorpus(el,v){
 function applyFilters(){
   FO=document.getElementById('forg').value;
   FM=document.getElementById('fplace').value;
+  FL1=document.getElementById('flvl1').value;
   FL2=document.getElementById('flvl2').value;
   FKP=document.getElementById('fkp').checked;
   render();
@@ -816,6 +825,7 @@ function applyFilters(){
 function applyFiltersAndTags(){
   FO=document.getElementById('forg').value;
   FM=document.getElementById('fplace').value;
+  FL1=document.getElementById('flvl1').value;
   FL2=document.getElementById('flvl2').value;
   FKP=document.getElementById('fkp').checked;
   renderFilterTags();
@@ -826,6 +836,7 @@ function renderFilterTags(){
   var tags=[];
   if(FO) tags.push({label:'Орг: '+FO, clear:function(){document.getElementById('forg').value='';FO='';applyFiltersAndTags();}});
   if(FM) tags.push({label:'Место: '+FM, clear:function(){document.getElementById('fplace').value='';FM='';applyFiltersAndTags();}});
+  if(FL1) tags.push({label:'Вид: '+FL1, clear:function(){document.getElementById('flvl1').value='';FL1='';applyFiltersAndTags();}});
   if(FL2) tags.push({label:'Уровень: '+FL2, clear:function(){document.getElementById('flvl2').value='';FL2='';applyFiltersAndTags();}});
   var bar=document.getElementById('filter-tags-bar');
   var list=document.getElementById('filter-tags-list');
@@ -855,6 +866,7 @@ function render(){
     if(FC.size>0&&!FC.has(r.corpus)) return false;
     if(FO&&r.org!==FO) return false;
     if(FM&&r.place!==FM) return false;
+    if(FL1&&r.lvl1!==FL1) return false;
     if(FL2&&r.lvl2!==FL2) return false;
     if(FW.size>0&&!FW.has(r.work)) return false;
     if(FKP&&!r.kp) return false;
@@ -870,33 +882,16 @@ function render(){
 
   FLOOR_LIST=[...new Set(rows.map(r=>parseFloat(String(r.floor).replace(',','.'))))].filter(n=>!isNaN(n)).sort((a,b)=>b-a);
 
-  // Уникальные комбинации corpus|place|lvl2|work|extra1 в правильном порядке
-  var corps=[...new Set(rows.map(r=>r.corpus))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));
-  var places=[...new Set(rows.map(r=>r.place||''))];
-  var lvl2s=[...new Set(rows.map(r=>r.lvl2||''))];
-  var works=[...new Set(rows.map(r=>r.work).filter(Boolean))];
-  var extra1s=[...new Set(rows.map(r=>r.extra1||''))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));
-
+  // Уникальные комбинации corpus|place|lvl2|work|extra1 — строим за один проход
   COL_KEYS=[];
   var colSet={};
-  corps.forEach(corp=>{
-    places.forEach(place=>{
-      lvl2s.forEach(lvl2=>{
-        works.forEach(work=>{
-          extra1s.forEach(extra1=>{
-            if(rows.some(r=>r.corpus===corp&&(r.place||'')=== place&&(r.lvl2||'')===lvl2&&r.work===work&&(r.extra1||'')===extra1)){
-              var ck=corp+'|||'+(place||'')+'|||'+(lvl2||'')+'|||'+work+'|||'+extra1;
-              if(!colSet[ck]){
-                var sample=rows.find(r=>r.corpus===corp&&(r.place||'')===place&&(r.lvl2||'')===lvl2&&r.work===work&&(r.extra1||'')===extra1);
-                var fn=sample?parseFloat(String(sample.factNum||'').replace(',','.'))||9999:9999;
-                COL_KEYS.push({corpus:corp,place:place||'',lvl2:lvl2||'',work:work,extra1:extra1,key:ck,factNum:fn});
-                colSet[ck]=true;
-              }
-            }
-          });
-        });
-      });
-    });
+  rows.forEach(r=>{
+    var ck=r.corpus+'|||'+(r.place||'')+'|||'+(r.lvl2||'')+'|||'+r.work+'|||'+(r.extra1||'');
+    if(!colSet[ck]){
+      var fn=parseFloat(String(r.factNum||'').replace(',','.'))||9999;
+      COL_KEYS.push({corpus:r.corpus,place:r.place||'',lvl2:r.lvl2||'',work:r.work,extra1:r.extra1||'',key:ck,factNum:fn});
+      colSet[ck]=true;
+    }
   });
 
   // Сортируем по корпусу → место → factNum

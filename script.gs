@@ -203,6 +203,7 @@ function getRows(filterCorpus) {
       pct        : String(row[10]).trim(),
       comment    : String(row[11]).trim(),
       place      : attrs.place,
+      lvl1       : attrs.lvl1,
       lvl2       : attrs.lvl2,
       kp         : attrs.kp,
       factNum    : attrs.factNum,
