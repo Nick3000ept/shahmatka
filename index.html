@@ -539,7 +539,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     </div>
     <div class="fg">
       <div class="fg-lbl">Подрядчик</div>
-      <select class="date-inp" id="p-contractor" style="font-family:var(--sans);font-size:12px;">
+      <select class="date-inp" id="p-contractor" style="font-family:var(--sans);font-size:12px;" onchange="_contractorTouched=true;">
         <option value="">— Без изменений —</option>
       </select>
     </div>
@@ -549,7 +549,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     </div>
     <div class="fg">
       <div class="fg-lbl">Комментарий</div>
-      <textarea class="comment-inp" id="p-comment" placeholder="Введите комментарий…" rows="3"></textarea>
+      <textarea class="comment-inp" id="p-comment" placeholder="Введите комментарий…" rows="3" oninput="_commentTouched=true;"></textarea>
     </div>
   </div>
   <div class="po-footer">
@@ -609,8 +609,11 @@ function saveAuthor(v){
 var SEL = new Set();   // rowId выбранных
 var CUR = null;        // текущая для одиночного режима
 var CUR_ST = 's-empty';
-var _pctTouched = false; // был ли слайдер процентов тронут
-var _dateTouched = false; // была ли дата изменена пользователем
+var _pctTouched = false;        // был ли слайдер процентов тронут
+var _dateTouched = false;       // была ли дата изменена пользователем
+var _statusTouched = false;     // был ли статус явно выбран пользователем
+var _commentTouched = false;    // был ли комментарий изменён
+var _contractorTouched = false; // был ли подрядчик изменён
 
 // Индексы столбцов, нужны для выбора по заголовку
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
@@ -1553,6 +1556,9 @@ function openPanel(rowId, anchorEl){
 
   _pctTouched=false;
   _dateTouched=false;
+  _statusTouched=false;
+  _commentTouched=false;
+  _contractorTouched=false;
   positionPopover(anchorEl);
   document.getElementById('popover').classList.add('on');
 }
@@ -1587,6 +1593,7 @@ function positionPopover(anchor){
 function closePanel(){document.getElementById('popover').classList.remove('on');CUR=null;}
 
 function selSt(s){
+  _statusTouched=true;
   CUR_ST=s;
   var ids={'s-done':'sc-done','s-started':'sc-started','s-accepted':'sc-accepted','s-onsite':'sc-onsite','s-remarks':'sc-remarks','s-empty':'sc-empty'};
   Object.entries(ids).forEach(([k,id])=>{
@@ -1626,12 +1633,12 @@ function savePanel(){
   if(!targets.length&&CUR) targets=[CUR.rowId];
   targets.forEach(rid=>{
     if(!MOD[rid]) MOD[rid]={};
-    MOD[rid].status=CUR_ST;
-    // Записываем pct только если слайдер был изменён пользователем
-    if(_pctTouched) MOD[rid].pct=pctVal;
-    if(_dateTouched) MOD[rid].dateEnd=dateEnd;
-    if(comment) MOD[rid].comment=comment;
-    if(contractor!=='') MOD[rid].org=contractor;
+    // Пишем только явно изменённые поля — защита от случайной перезаписи
+    if(_statusTouched) MOD[rid].status=CUR_ST;
+    if(_pctTouched)    MOD[rid].pct=pctVal;
+    if(_dateTouched)   MOD[rid].dateEnd=dateEnd;
+    if(_commentTouched) MOD[rid].comment=comment;   // пустая строка = очистка комментария
+    if(_contractorTouched) MOD[rid].org=contractor; // пустая строка = снять подрядчика
   });
 
   closePanel();render();
@@ -1669,11 +1676,6 @@ async function batchSave(rowIds){
   try{
     // До 20 строк — пишем построчно через saveRow (быстро)
     // Больше 20 — пакетная запись через saveAll (медленнее но надёжнее)
-    var action = rowIds.length <= 20 ? 'saveRow' : 'saveAll';
-    var body = rowIds.length <= 20
-      ? JSON.stringify({action:'saveAll', rows:payload})  // saveAll умеет обрабатывать массив
-      : JSON.stringify({action:'saveAll', rows:payload});
-
     // Для малого кол-ва — параллельные одиночные запросы
     if(rowIds.length <= 20){
       var promises = payload.map(p=>
