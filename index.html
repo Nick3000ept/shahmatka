@@ -791,6 +791,12 @@ function buildFilters(){
   var works=[...new Set(ROWS.map(r=>r.work).filter(Boolean))].sort();
   WORKS=works;
   renderWorkDrop('');
+
+  // Если открыто по ссылке подрядчика — автоматически выставляем его организацию в фильтр
+  if(CONTRACTOR && !IS_ADMIN){
+    os.value=CONTRACTOR;
+    FO=CONTRACTOR;
+  }
 }
 function setCorpus(el,v){
   var allChip=document.querySelector('#fc .chip[data-corpus=""]');
