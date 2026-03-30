@@ -232,6 +232,20 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
 .filter-tag-x{cursor:pointer;opacity:.6;font-size:9px;margin-left:2px;}
 .filter-tag-x:hover{opacity:1;}
 .checkbar{display:flex;align-items:center;gap:16px;padding:4px 16px;background:var(--bg2);border-bottom:1px solid var(--brd);flex-shrink:0;}
+.presetbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 16px;background:var(--bg2);border-bottom:1px solid var(--brd);flex-shrink:0;min-height:28px;}
+.preset-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 10px;border-radius:14px;font-size:11px;font-weight:500;border:1px solid var(--acc);background:var(--bg3);color:var(--acc);cursor:pointer;white-space:nowrap;transition:all .1s;}
+.preset-chip:hover{background:var(--acc);color:#fff;}
+.preset-chip .pdel{opacity:.5;font-size:13px;line-height:1;padding:0 2px;cursor:pointer;}
+.preset-chip .pdel:hover{opacity:1;}
+.preset-add{padding:2px 10px;border-radius:14px;font-size:11px;font-weight:500;border:1px dashed var(--brd2);background:transparent;color:var(--ink3);cursor:pointer;transition:all .1s;}
+.preset-add:hover{border-color:var(--acc);color:var(--acc);}
+.preset-inp-row{display:none;align-items:center;gap:5px;}
+.preset-inp-row.show{display:flex;}
+.preset-inp{padding:2px 8px;border:1px solid var(--brd2);border-radius:6px;font-size:12px;background:var(--bg3);color:var(--ink1);outline:none;width:160px;}
+.preset-inp:focus{border-color:var(--acc);}
+.preset-btn{padding:2px 10px;border-radius:6px;font-size:11px;font-weight:500;border:none;cursor:pointer;}
+.preset-btn.ok{background:var(--acc);color:#fff;}
+.preset-btn.cancel{background:var(--bg3);color:var(--ink3);border:1px solid var(--brd2);}
 .chk-lbl{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink2);cursor:pointer;user-select:none;}
 .chk-lbl input{cursor:pointer;accent-color:var(--acc);}
 .chk-lbl:hover{color:var(--ink);}
@@ -422,6 +436,19 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <input type="checkbox" id="fsp" onchange="toggleSP(this.checked)">
     Показать СП
   </label>
+</div>
+
+<!-- PRESET BAR -->
+<div class="presetbar" id="presetbar">
+  <span class="fl" style="color:var(--ink3);font-size:11px;">Пресеты:</span>
+  <div id="preset-chips" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+  <button class="preset-add" onclick="presetAddClick()">+ Сохранить набор</button>
+  <div class="preset-inp-row" id="preset-inp-row">
+    <input class="preset-inp" id="preset-inp" placeholder="Название пресета…" maxlength="40"
+      onkeydown="if(event.key==='Enter')savePreset();if(event.key==='Escape')presetCancelClick();">
+    <button class="preset-btn ok" onclick="savePreset()">Сохранить</button>
+    <button class="preset-btn cancel" onclick="presetCancelClick()">Отмена</button>
+  </div>
 </div>
 
 <!-- MULTISELECT BAR -->
@@ -679,6 +706,7 @@ window.onload=function(){
   var a=localStorage.getItem('sb3_author')||'';
   if(a){AUTHOR=a;var ai=document.getElementById('author-inp');if(ai)ai.value=a;}
   BASE='https://script.google.com/macros/s/AKfycbwBRlgDFkLzGfJngvBczEBLaXMxlr3l4jGai_-ZHw28EVJrogYvxsqnecuZbZS3EJdG/exec';
+  loadPresets();
   loadData();
   setTimeout(loadContractors, 1500);
   document.addEventListener('keydown',function(e){
@@ -861,6 +889,84 @@ function clearFilterTag(i){
 function toggleSP(on){
   SHOW_SP=on;
   render();
+}
+
+// ─── PRESETS ──────────────────────────────────────────────────────
+var PRESETS={};
+function loadPresets(){
+  try{PRESETS=JSON.parse(localStorage.getItem('sb3_presets')||'{}');}catch(ex){PRESETS={};}
+  renderPresetChips();
+}
+function renderPresetChips(){
+  var names=Object.keys(PRESETS);
+  var el=document.getElementById('preset-chips');
+  el.innerHTML='';
+  names.forEach(function(n){
+    var chip=document.createElement('span');
+    chip.className='preset-chip';
+    chip.title='Применить: '+n;
+    chip.innerHTML=e(n)+'<span class="pdel" title="Удалить" onclick="event.stopPropagation();deletePreset(\''+e(n).replace(/'/g,"\\'")+'\')">&times;</span>';
+    chip.addEventListener('click',function(){applyPreset(n);});
+    el.appendChild(chip);
+  });
+}
+function presetAddClick(){
+  var row=document.getElementById('preset-inp-row');
+  row.classList.add('show');
+  var inp=document.getElementById('preset-inp');
+  inp.value='';
+  inp.focus();
+}
+function presetCancelClick(){
+  document.getElementById('preset-inp-row').classList.remove('show');
+}
+function savePreset(){
+  var name=document.getElementById('preset-inp').value.trim();
+  if(!name){toast('Введите название','err');return;}
+  PRESETS[name]={
+    corpus:[...FC],
+    org:FO,
+    place:FM,
+    lvl1:FL1,
+    lvl2:FL2,
+    works:[...FW],
+    kp:FKP
+  };
+  localStorage.setItem('sb3_presets',JSON.stringify(PRESETS));
+  renderPresetChips();
+  presetCancelClick();
+  toast('Пресет «'+name+'» сохранён','ok');
+}
+function applyPreset(name){
+  var p=PRESETS[name];
+  if(!p) return;
+  // Корпус
+  FC.clear();
+  (p.corpus||[]).forEach(function(c){FC.add(c);});
+  document.querySelectorAll('#fc .chip').forEach(function(ch){
+    var cv=ch.dataset.corpus;
+    if(cv==='') ch.classList.toggle('on',FC.size===0);
+    else ch.classList.toggle('on',FC.has(cv));
+  });
+  // Остальные фильтры
+  FO=p.org||''; document.getElementById('forg').value=FO;
+  FM=p.place||''; document.getElementById('fplace').value=FM;
+  FL1=p.lvl1||''; document.getElementById('flvl1').value=FL1;
+  FL2=p.lvl2||''; document.getElementById('flvl2').value=FL2;
+  FKP=!!p.kp; document.getElementById('fkp').checked=FKP;
+  // Работы
+  FW.clear();
+  (p.works||[]).forEach(function(w){FW.add(w);});
+  updateWorkInp();
+  renderFilterTags();
+  render();
+  toast('Пресет «'+name+'» применён','ok');
+}
+function deletePreset(name){
+  delete PRESETS[name];
+  localStorage.setItem('sb3_presets',JSON.stringify(PRESETS));
+  renderPresetChips();
+  toast('Пресет удалён','inf');
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────
