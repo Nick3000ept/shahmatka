@@ -1647,11 +1647,13 @@ function savePanel(){
   targets.forEach(rid=>{
     if(!MOD[rid]) MOD[rid]={};
     // Пишем только явно изменённые поля — защита от случайной перезаписи
-    if(_statusTouched) MOD[rid].status=CUR_ST;
-    if(_pctTouched)    MOD[rid].pct=pctVal;
-    if(_dateTouched)   MOD[rid].dateEnd=dateEnd;
-    if(_commentTouched) MOD[rid].comment=comment;   // пустая строка = очистка комментария
-    if(_contractorTouched) MOD[rid].org=contractor; // пустая строка = снять подрядчика
+    if(_statusTouched)     MOD[rid].status=CUR_ST;
+    if(_pctTouched)        MOD[rid].pct=pctVal;
+    if(_dateTouched)       MOD[rid].dateEnd=dateEnd;
+    if(_commentTouched)    MOD[rid].comment=comment;
+    if(_contractorTouched) MOD[rid].org=contractor;
+    // Если ничего не изменилось — не добавлять в очередь на сохранение
+    if(Object.keys(MOD[rid]).length===0) delete MOD[rid];
   });
 
   closePanel();render();

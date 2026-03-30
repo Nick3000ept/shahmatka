@@ -119,14 +119,16 @@ function doPost(e) {
           if (idx === undefined) return;
 
           // Меняем ТОЛЬКО пришедшие поля — остальные остаются как были
-          if (r.status  !== undefined) allValues[idx][C.STATUS   - off] = r.status  || '';
-          if (r.pct     !== undefined) allValues[idx][C.PCT      - off] = r.pct     || '';
-          if (r.comment !== undefined) allValues[idx][C.COMMENT  - off] = r.comment || '';
-          if (r.org     !== undefined) allValues[idx][C.ORG      - off] = r.org     || '';
-          if (r.dateEnd !== undefined) allValues[idx][C.DATE_END - off] = parseDate(r.dateEnd) || r.dateEnd || '';
-          if (r.author)                allValues[idx][C.AUTHOR   - off] = r.author;
-          allValues[idx][C.DATE_CHG   - off] = nowStr;
-          changedIndices.push(idx);
+          var anyChange = false;
+          if (r.status  !== undefined) { allValues[idx][C.STATUS   - off] = r.status  || ''; anyChange = true; }
+          if (r.pct     !== undefined) { allValues[idx][C.PCT      - off] = r.pct     || ''; anyChange = true; }
+          if (r.comment !== undefined) { allValues[idx][C.COMMENT  - off] = r.comment || ''; anyChange = true; }
+          if (r.org     !== undefined) { allValues[idx][C.ORG      - off] = r.org     || ''; anyChange = true; }
+          if (r.dateEnd !== undefined) { allValues[idx][C.DATE_END - off] = parseDate(r.dateEnd) || r.dateEnd || ''; anyChange = true; }
+          if (r.author)                  allValues[idx][C.AUTHOR   - off] = r.author;
+          // DATE_CHG только если действительно что-то изменилось
+          if (anyChange) allValues[idx][C.DATE_CHG - off] = nowStr;
+          if (anyChange) changedIndices.push(idx);
         });
 
         // Пишем ТОЛЬКО изменённые строки — не трогаем остальные (избегаем ошибок валидации)
@@ -260,13 +262,16 @@ function saveOneRow(data) {
   var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy');
 
   var off = EDIT_START; // 7 — смещение: индекс в rowValues = C.X - off
-  if (data.status  !== undefined) rowValues[C.STATUS   - off] = data.status  || '';
-  if (data.dateEnd !== undefined) rowValues[C.DATE_END - off] = parseDate(data.dateEnd) || data.dateEnd || '';
-  if (data.pct     !== undefined) rowValues[C.PCT      - off] = data.pct     || '';
-  if (data.org     !== undefined) rowValues[C.ORG      - off] = data.org     || '';
-  if (data.comment !== undefined) rowValues[C.COMMENT  - off] = data.comment || '';
-  if (data.author)                rowValues[C.AUTHOR   - off] = data.author;
-  rowValues[C.DATE_CHG - off] = nowStr;
+  var anyChange = false;
+  if (data.status  !== undefined) { rowValues[C.STATUS   - off] = data.status  || ''; anyChange = true; }
+  if (data.dateEnd !== undefined) { rowValues[C.DATE_END - off] = parseDate(data.dateEnd) || data.dateEnd || ''; anyChange = true; }
+  if (data.pct     !== undefined) { rowValues[C.PCT      - off] = data.pct     || ''; anyChange = true; }
+  if (data.org     !== undefined) { rowValues[C.ORG      - off] = data.org     || ''; anyChange = true; }
+  if (data.comment !== undefined) { rowValues[C.COMMENT  - off] = data.comment || ''; anyChange = true; }
+  if (data.author)                  rowValues[C.AUTHOR   - off] = data.author;
+  // DATE_CHG только если действительно что-то изменилось
+  if (anyChange) rowValues[C.DATE_CHG - off] = nowStr;
+  if (!anyChange) return; // нечего писать — выходим без записи в таблицу
 
   // G (org) может иметь dropdown-валидацию: при ошибке fallback на H-N
   try {
