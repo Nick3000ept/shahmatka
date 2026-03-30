@@ -426,7 +426,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <div class="work-tags" id="work-tags"></div>
 </div>
 
-<!-- CHECKBAR -->
+<!-- CHECKBAR + PRESETS -->
 <div class="checkbar">
   <label class="chk-lbl">
     <input type="checkbox" id="fkp" onchange="applyFilters()">
@@ -436,18 +436,15 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <input type="checkbox" id="fsp" onchange="toggleSP(this.checked)">
     Показать СП
   </label>
-</div>
-
-<!-- PRESET BAR -->
-<div class="presetbar" id="presetbar">
-  <span class="fl" style="color:var(--ink3);font-size:11px;">Пресеты:</span>
+  <div class="fsep"></div>
+  <span class="fl" style="font-size:11px;">Пресеты:</span>
   <div id="preset-chips" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
-  <button class="preset-add" onclick="presetAddClick()">+ Сохранить набор</button>
+  <button class="preset-add" onclick="presetAddClick()">+ Сохранить</button>
   <div class="preset-inp-row" id="preset-inp-row">
-    <input class="preset-inp" id="preset-inp" placeholder="Название пресета…" maxlength="40"
+    <input class="preset-inp" id="preset-inp" placeholder="Название…" maxlength="40"
       onkeydown="if(event.key==='Enter')savePreset();if(event.key==='Escape')presetCancelClick();">
-    <button class="preset-btn ok" onclick="savePreset()">Сохранить</button>
-    <button class="preset-btn cancel" onclick="presetCancelClick()">Отмена</button>
+    <button class="preset-btn ok" onclick="savePreset()">OK</button>
+    <button class="preset-btn cancel" onclick="presetCancelClick()">✕</button>
   </div>
 </div>
 
@@ -862,6 +859,8 @@ function applyFiltersAndTags(){
   FL1=document.getElementById('flvl1').value;
   FL2=document.getElementById('flvl2').value;
   FKP=document.getElementById('fkp').checked;
+  ACTIVE_PRESET=null;
+  renderPresetChips();
   renderFilterTags();
   render();
 }
@@ -893,6 +892,7 @@ function toggleSP(on){
 
 // ─── PRESETS ──────────────────────────────────────────────────────
 var PRESETS={};
+var ACTIVE_PRESET=null;
 function loadPresets(){
   try{PRESETS=JSON.parse(localStorage.getItem('sb3_presets')||'{}');}catch(ex){PRESETS={};}
   renderPresetChips();
@@ -903,8 +903,8 @@ function renderPresetChips(){
   el.innerHTML='';
   names.forEach(function(n){
     var chip=document.createElement('span');
-    chip.className='preset-chip';
-    chip.title='Применить: '+n;
+    chip.className='preset-chip'+(ACTIVE_PRESET===n?' on':'');
+    chip.title=(ACTIVE_PRESET===n?'Снять фильтры':'Применить: ')+n;
     chip.innerHTML=e(n)+'<span class="pdel" title="Удалить" onclick="event.stopPropagation();deletePreset(\''+e(n).replace(/'/g,"\\'")+'\')">&times;</span>';
     chip.addEventListener('click',function(){applyPreset(n);});
     el.appendChild(chip);
@@ -938,8 +938,27 @@ function savePreset(){
   toast('Пресет «'+name+'» сохранён','ok');
 }
 function applyPreset(name){
+  // Повторный клик — снимаем фильтры
+  if(ACTIVE_PRESET===name){
+    ACTIVE_PRESET=null;
+    FC.clear(); FO=''; FM=''; FL1=''; FL2=''; FKP=false; FW.clear();
+    document.getElementById('forg').value='';
+    document.getElementById('fplace').value='';
+    document.getElementById('flvl1').value='';
+    document.getElementById('flvl2').value='';
+    document.getElementById('fkp').checked=false;
+    document.querySelectorAll('#fc .chip').forEach(function(ch){
+      ch.classList.toggle('on', ch.dataset.corpus==='');
+    });
+    updateWorkInp();
+    renderPresetChips();
+    renderFilterTags();
+    render();
+    return;
+  }
   var p=PRESETS[name];
   if(!p) return;
+  ACTIVE_PRESET=name;
   // Корпус
   FC.clear();
   (p.corpus||[]).forEach(function(c){FC.add(c);});
@@ -958,9 +977,9 @@ function applyPreset(name){
   FW.clear();
   (p.works||[]).forEach(function(w){FW.add(w);});
   updateWorkInp();
+  renderPresetChips();
   renderFilterTags();
   render();
-  toast('Пресет «'+name+'» применён','ok');
 }
 function deletePreset(name){
   delete PRESETS[name];
