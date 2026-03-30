@@ -353,6 +353,8 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
 /* Футер */
 .po-footer{padding:7px 14px 12px;border-top:1px solid var(--brd);display:flex;gap:5px;}
 .po-footer .btn{flex:1;justify-content:center;font-size:11px;padding:4px 8px;}
+.po-meta{padding:5px 14px 0;font-size:10px;color:var(--ink3);display:flex;gap:10px;flex-wrap:wrap;}
+.po-meta span{white-space:nowrap;}
 
 /* ── TOAST ── */
 .toasts{position:fixed;bottom:32px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:4px;pointer-events:none;}
@@ -552,6 +554,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
       <textarea class="comment-inp" id="p-comment" placeholder="Введите комментарий…" rows="3" oninput="_commentTouched=true;"></textarea>
     </div>
   </div>
+  <div class="po-meta" id="po-meta"></div>
   <div class="po-footer">
     <button class="btn" onclick="closePanel()">Отмена</button>
     <button class="btn btn-pri" onclick="savePanel()">Сохранить в таблицу</button>
@@ -1559,6 +1562,16 @@ function openPanel(rowId, anchorEl){
   _statusTouched=false;
   _commentTouched=false;
   _contractorTouched=false;
+
+  // Справочно: автор и дата последних изменений
+  var meta=document.getElementById('po-meta');
+  var metaParts=[];
+  var chgDate=mod.dateChg||row.dateChg||'';
+  var chgAuthor=mod.author||row.author||'';
+  if(chgDate) metaParts.push('<span>Изменено: '+e(chgDate)+'</span>');
+  if(chgAuthor) metaParts.push('<span>Автор: '+e(chgAuthor)+'</span>');
+  meta.innerHTML=metaParts.length?metaParts.join('<span style="color:var(--brd2)">·</span>'):'';
+
   positionPopover(anchorEl);
   document.getElementById('popover').classList.add('on');
 }
@@ -1700,6 +1713,8 @@ async function batchSave(rowIds){
         if(mod.dateEnd!==undefined) row.dateEnd=mod.dateEnd;
         if(mod.comment!==undefined) row.comment=mod.comment;
         if(mod.org!==undefined) row.org=mod.org;
+        row.dateChg=new Date().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});
+        row.author=AUTHOR;
       }
       delete MOD[rid];
     });

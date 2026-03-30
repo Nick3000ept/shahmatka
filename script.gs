@@ -213,6 +213,8 @@ function getRows(filterCorpus) {
       dateEnd    : formatDateOut(row[8]),
       pct        : String(row[10]).trim(),
       comment    : String(row[11]).trim(),
+      dateChg    : formatDateOut(row[12]),
+      author     : String(row[13]).trim(),
       place      : attrs.place,
       lvl1       : attrs.lvl1,
       lvl2       : attrs.lvl2,
