@@ -31,6 +31,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);height:100vh;
 .logo-badge{background:var(--acc);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.1em;}
 .sep{width:1px;height:16px;background:var(--brd2);flex-shrink:0;}
 .url-input{flex:1;max-width:380px;padding:5px 9px;background:var(--bg3);border:1px solid var(--brd2);border-radius:var(--r);color:var(--ink2);font-family:var(--mono);font-size:11px;outline:none;transition:border-color .15s;}
+.admin-only{display:none!important;}
 .url-input:focus{border-color:var(--acc);color:var(--ink);}
 .url-input::placeholder{color:var(--ink3);}
 .btn{padding:4px 11px;border-radius:var(--r);border:1px solid var(--brd2);background:var(--bg3);color:var(--ink2);font-family:var(--sans);font-size:11px;font-weight:500;cursor:pointer;transition:all .12s;white-space:nowrap;display:flex;align-items:center;gap:5px;}
@@ -385,8 +386,8 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <div class="sep"></div>
   <span class="fl" style="font-size:11px;color:var(--ink3);">👤</span>
   <input class="url-input" id="author-inp" placeholder="Ваше имя…" style="width:130px;" oninput="saveAuthor(this.value)">
-  <span class="fl" style="font-size:11px;color:var(--ink3);">📅</span>
-  <input type="date" class="url-input" id="fdate-inp" title="Показать работы до даты" style="width:130px;font-size:11px;" oninput="setFDate(this.value)">
+  <span class="fl admin-only" style="font-size:11px;color:var(--ink3);">📅</span>
+  <input type="date" class="url-input admin-only" id="fdate-inp" title="Показать работы до даты" style="width:130px;font-size:11px;" oninput="setFDate(this.value)">
   <div class="tb-right">
     <span class="unsaved" id="ubadge"></span>
     <button class="btn btn-save" id="save-all-btn" style="display:none" onclick="saveAll()">💾 Сохранить всё</button>
@@ -472,9 +473,9 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <span class="ms-pct-val" id="ms-pct-val">0%</span>
   <label class="ms-chk-lbl"><input type="checkbox" id="ms-pct-reset" onchange="msPctResetToggle(this.checked)"> Сбросить %</label>
   <div class="ms-sep"></div>
-  <span class="ms-lbl">Подрядчик:</span>
-  <select class="fsel" id="ms-contractor" onchange="msUpdatePreview()"><option value="">— не менять —</option></select>
-  <div class="ms-sep"></div>
+  <span class="ms-lbl admin-only" id="ms-contr-lbl">Подрядчик:</span>
+  <select class="fsel admin-only" id="ms-contractor" onchange="msUpdatePreview()"><option value="">— не менять —</option></select>
+  <div class="ms-sep admin-only" id="ms-contr-sep"></div>
   <button class="ms-apply" onclick="msCommit()">💾 Сохранить в таблицу</button>
   <div class="ms-preview" id="ms-preview"></div>
   <button class="ms-clear" onclick="clearSel();resetMsDraft()">✕ Снять выбор</button>
@@ -541,7 +542,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
         <button class="pct-b" onclick="setPct(100)">100</button>
       </div>
     </div>
-    <div class="fg">
+    <div class="fg admin-only" id="fg-contractor">
       <div class="fg-lbl">Подрядчик</div>
       <select class="date-inp" id="p-contractor" style="font-family:var(--sans);font-size:12px;" onchange="_contractorTouched=true;">
         <option value="">— Без изменений —</option>
@@ -712,6 +713,7 @@ window.onload=function(){
   var a=localStorage.getItem('sb3_author')||'';
   if(a){AUTHOR=a;var ai=document.getElementById('author-inp');if(ai)ai.value=a;}
   BASE='https://script.google.com/macros/s/AKfycbwBRlgDFkLzGfJngvBczEBLaXMxlr3l4jGai_-ZHw28EVJrogYvxsqnecuZbZS3EJdG/exec';
+  applyAdminUI();
   loadPresets();
   loadData();
   setTimeout(loadContractors, 1500);
@@ -1755,6 +1757,12 @@ async function saveAll(){
 }
 
 // ─── ROLES / PASSWORD ─────────────────────────────────────────────
+function applyAdminUI(){
+  document.querySelectorAll('.admin-only').forEach(function(el){
+    el.classList.toggle('admin-only', !IS_ADMIN);
+  });
+}
+
 function openPwdModal(callback){
   _pwdCallback=callback;
   document.getElementById('pwd-inp').value='';
@@ -1776,6 +1784,7 @@ async function submitPwd(){
     if(j.ok){
       IS_ADMIN=true;
       sessionStorage.setItem('sb3_admin','1');
+      applyAdminUI();
       closePwdModal();
       render();
       if(_pwdCallback){var cb=_pwdCallback;_pwdCallback=null;cb();}
