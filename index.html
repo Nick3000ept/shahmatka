@@ -385,6 +385,8 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <div class="sep"></div>
   <span class="fl" style="font-size:11px;color:var(--ink3);">👤</span>
   <input class="url-input" id="author-inp" placeholder="Ваше имя…" style="width:130px;" oninput="saveAuthor(this.value)">
+  <span class="fl" style="font-size:11px;color:var(--ink3);">📅</span>
+  <input type="date" class="url-input" id="fdate-inp" title="Показать работы до даты" style="width:130px;font-size:11px;" oninput="setFDate(this.value)">
   <div class="tb-right">
     <span class="unsaved" id="ubadge"></span>
     <button class="btn btn-save" id="save-all-btn" style="display:none" onclick="saveAll()">💾 Сохранить всё</button>
@@ -622,7 +624,7 @@ var _contractorTouched = false; // был ли подрядчик изменён
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = []; // порядок строк
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false;
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='';
 var WORKS=[];
 
 function renderWorkDrop(query){
@@ -896,6 +898,10 @@ function toggleSP(on){
   SHOW_SP=on;
   render();
 }
+function setFDate(v){
+  FDATE=v;
+  render();
+}
 
 // ─── PRESETS ──────────────────────────────────────────────────────
 var PRESETS={};
@@ -1000,6 +1006,7 @@ function render(){
   var board=document.getElementById('board');
   var empty=document.getElementById('empty');
 
+  var fdateMs=FDATE?new Date(FDATE).getTime():0;
   var rows=ROWS.filter(r=>{
     if(FC.size>0&&!FC.has(r.corpus)) return false;
     if(FO&&r.org!==FO) return false;
@@ -1008,6 +1015,16 @@ function render(){
     if(FL2&&r.lvl2!==FL2) return false;
     if(FW.size>0&&!FW.has(r.work)) return false;
     if(FKP&&!r.kp) return false;
+    // Фильтр по дате: показываем строку если хотя бы одна из дат <= указанной
+    if(fdateMs){
+      var d1=r.baseDate?parseDateMs(fmtDate(r.baseDate)):0;
+      var d2=r.dateEnd?parseDateMs(fmtDate(r.dateEnd)):0;
+      var d3=r.currentDate?parseDateMs(fmtDate(r.currentDate)):0;
+      var minD=Math.max(d1||0,d2||0,d3||0); // хотя бы одна дата должна быть заполнена
+      if(!minD) return false; // строки без дат скрываем
+      var hasDateBefore=(d1&&d1<=fdateMs)||(d2&&d2<=fdateMs)||(d3&&d3<=fdateMs);
+      if(!hasDateBefore) return false;
+    }
     return true;
   });
 
