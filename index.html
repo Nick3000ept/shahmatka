@@ -466,7 +466,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <span class="ms-sc"   id="msc-empty"    onclick="msDraftStatus('s-empty')">— Сброс</span>
   <div class="ms-sep"></div>
   <span class="ms-lbl">Дата:</span>
-  <input type="date" class="ms-date" id="ms-date" oninput="msUpdatePreview()">
+  <input type="date" class="ms-date" id="ms-date" oninput="msUpdatePreview()" onkeydown="return false;">
   <div class="ms-sep"></div>
   <span class="ms-lbl">%:</span>
   <input type="range" class="ms-pct-sl" id="ms-pct-sl" min="0" max="100" step="5" value="0" oninput="msPctUpd(this.value)">
@@ -550,7 +550,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     </div>
     <div class="fg">
       <div class="fg-lbl">Дата окончания</div>
-      <input type="date" class="date-inp" id="p-date" onchange="_dateTouched=true;">
+      <input type="date" class="date-inp" id="p-date" onchange="_dateTouched=true;" onkeydown="return false;">
     </div>
     <div class="fg">
       <div class="fg-lbl">Комментарий</div>
