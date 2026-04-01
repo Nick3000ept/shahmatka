@@ -390,6 +390,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <input type="date" class="url-input admin-only" id="fdate-inp" title="Показать работы до даты" style="width:130px;font-size:11px;" oninput="setFDate(this.value)">
   <div class="tb-right">
     <span class="unsaved" id="ubadge"></span>
+    <button class="btn" id="show-mod-btn" style="display:none;font-size:11px;" onclick="toggleFMod()">Посмотреть изменения</button>
     <button class="btn btn-save" id="save-all-btn" style="display:none" onclick="saveAll()">💾 Сохранить всё</button>
     <div class="sep"></div>
     <button class="btn zoom-btn" onclick="changeZoom(-10)">−</button>
@@ -625,7 +626,7 @@ var _contractorTouched = false; // был ли подрядчик изменён
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = []; // порядок строк
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='';
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false;
 var WORKS=[];
 
 function renderWorkDrop(query){
@@ -904,6 +905,12 @@ function setFDate(v){
   FDATE=v;
   render();
 }
+function toggleFMod(){
+  FMOD=!FMOD;
+  var btn=document.getElementById('show-mod-btn');
+  if(btn) btn.classList.toggle('btn-pri', FMOD);
+  render();
+}
 
 // ─── PRESETS ──────────────────────────────────────────────────────
 var PRESETS={};
@@ -1017,6 +1024,7 @@ function render(){
     if(FL2&&r.lvl2!==FL2) return false;
     if(FW.size>0&&!FW.has(r.work)) return false;
     if(FKP&&!r.kp) return false;
+    if(FMOD&&!MOD[r.rowId]) return false;
     // Фильтр по дате: показываем строку если хотя бы одна из дат <= указанной
     if(fdateMs){
       var d1=r.baseDate?parseDateMs(fmtDate(r.baseDate)):0;
@@ -1316,9 +1324,19 @@ function renderSB(rows){
 
 function renderUnsaved(){
   var n=Object.keys(MOD).length;
-  var b=document.getElementById('ubadge'), s=document.getElementById('save-all-btn');
-  if(n){b.classList.add('on');b.textContent=n+' несохр.';s.style.display='flex';}
-  else{b.classList.remove('on');s.style.display='none';}
+  var b=document.getElementById('ubadge');
+  var s=document.getElementById('save-all-btn');
+  var m=document.getElementById('show-mod-btn');
+  if(n){
+    b.classList.add('on'); b.textContent=n+' несохр.';
+    s.style.display='flex';
+    if(m) m.style.display='flex';
+  } else {
+    b.classList.remove('on'); s.style.display='none';
+    if(m) m.style.display='none';
+    // Сбрасываем режим просмотра изменений если изменений не осталось
+    if(FMOD){ FMOD=false; if(m) m.classList.remove('btn-pri'); render(); }
+  }
 }
 
 // ─── SELECTION ────────────────────────────────────────────────────
