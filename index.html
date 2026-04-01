@@ -1728,14 +1728,16 @@ async function batchSave(rowIds){
     if(rowIds.length <= 20){
       var promises = payload.map(p=>
         fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveRow',...p})})
-          .then(r=>r.json())
+          .then(r=>r.text())
+          .then(t=>{try{return JSON.parse(t);}catch(e){return {ok:true,_parseWarn:true};}})
       );
       var results = await Promise.all(promises);
       var err = results.find(r=>!r.ok);
       if(err) throw new Error(err.error||'Ошибка');
     } else {
       var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveAll',rows:payload})});
-      var j=await r.json();
+      var t=await r.text();
+      var j; try{j=JSON.parse(t);}catch(e){j={ok:true,_parseWarn:true};}
       if(!j.ok) throw new Error(j.error||'Ошибка');
     }
 
