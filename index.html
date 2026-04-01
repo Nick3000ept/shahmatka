@@ -383,9 +383,6 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <div class="sep"></div>
   <div class="sync-dot" id="sdot"></div>
   <span class="sync-txt" id="stxt">Не подключено</span>
-  <div class="sep"></div>
-  <span class="fl" style="font-size:11px;color:var(--ink3);">👤</span>
-  <input class="url-input" id="author-inp" placeholder="Ваше имя…" style="width:130px;" oninput="saveAuthor(this.value)">
   <span class="fl admin-only" style="font-size:11px;color:var(--ink3);">📅</span>
   <input type="date" class="url-input admin-only" id="fdate-inp" title="Показать работы до даты" style="width:130px;font-size:11px;" oninput="setFDate(this.value)">
   <div class="tb-right">
@@ -393,9 +390,8 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <button class="btn" id="show-mod-btn" style="display:none;font-size:11px;" onclick="toggleFMod()">Посмотреть изменения</button>
     <button class="btn btn-save" id="save-all-btn" style="display:none" onclick="saveAll()">💾 Сохранить всё</button>
     <div class="sep"></div>
-    <button class="btn zoom-btn" onclick="changeZoom(-10)">−</button>
-    <span class="zoom-val" id="zoom-val">100%</span>
-    <button class="btn zoom-btn" onclick="changeZoom(+10)">+</button>
+    <span class="fl" style="font-size:11px;color:var(--ink3);">👤</span>
+    <input class="url-input" id="author-inp" placeholder="Ваше имя…" style="width:130px;" oninput="saveAuthor(this.value)">
   </div>
 </div>
 
