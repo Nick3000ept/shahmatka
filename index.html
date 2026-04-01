@@ -592,7 +592,7 @@ function applyZoom(){
   wrap.style.transform='';
   wrap.style.width='';
   wrap.style.height='';
-  document.getElementById('zoom-val').textContent=ZOOM+'%';
+  var zv=document.getElementById('zoom-val'); if(zv) zv.textContent=ZOOM+'%';
 }
 
 var BASE='', ROWS=[], MOD={};
