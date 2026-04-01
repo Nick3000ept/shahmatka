@@ -149,7 +149,7 @@ function doPost(e) {
       } finally {
         lock.releaseLock();
       }
-      return jsonOut({ok: true, saved: rows.length});
+      return jsonOut({ok: true, saved: changedIndices.length, requested: rows.length});
     }
 
     return jsonOut({error: 'Unknown action: ' + body.action});

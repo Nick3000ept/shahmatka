@@ -463,7 +463,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <span class="ms-sc"   id="msc-empty"    onclick="msDraftStatus('s-empty')">— Сброс</span>
   <div class="ms-sep"></div>
   <span class="ms-lbl">Дата:</span>
-  <input type="date" class="ms-date" id="ms-date" oninput="msUpdatePreview()" onkeydown="return false;">
+  <input type="date" class="ms-date" id="ms-date" oninput="msUpdatePreview()">
   <div class="ms-sep"></div>
   <span class="ms-lbl">%:</span>
   <input type="range" class="ms-pct-sl" id="ms-pct-sl" min="0" max="100" step="5" value="0" oninput="msPctUpd(this.value)">
@@ -547,7 +547,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     </div>
     <div class="fg">
       <div class="fg-lbl">Дата окончания</div>
-      <input type="date" class="date-inp" id="p-date" onchange="_dateTouched=true;" onkeydown="return false;">
+      <input type="date" class="date-inp" id="p-date" onchange="_dateTouched=true;">
     </div>
     <div class="fg">
       <div class="fg-lbl">Комментарий</div>
@@ -710,6 +710,9 @@ window.onload=function(){
   var a=localStorage.getItem('sb3_author')||'';
   if(a){AUTHOR=a;var ai=document.getElementById('author-inp');if(ai)ai.value=a;}
   BASE='https://script.google.com/macros/s/AKfycbwBRlgDFkLzGfJngvBczEBLaXMxlr3l4jGai_-ZHw28EVJrogYvxsqnecuZbZS3EJdG/exec';
+  window.addEventListener('beforeunload',function(e){
+    if(Object.keys(MOD).length>0){e.preventDefault();e.returnValue='';}
+  });
   applyAdminUI();
   loadPresets();
   loadData();
@@ -1725,11 +1728,12 @@ async function batchSave(rowIds){
     // До 20 строк — пишем построчно через saveRow (быстро)
     // Больше 20 — пакетная запись через saveAll (медленнее но надёжнее)
     // Для малого кол-ва — параллельные одиночные запросы
+    var _hasParseWarn=false;
     if(rowIds.length <= 20){
       var promises = payload.map(p=>
         fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveRow',...p})})
           .then(r=>r.text())
-          .then(t=>{try{return JSON.parse(t);}catch(e){return {ok:true,_parseWarn:true};}})
+          .then(t=>{try{return JSON.parse(t);}catch(e){_hasParseWarn=true;return {ok:true,_parseWarn:true};}})
       );
       var results = await Promise.all(promises);
       var err = results.find(r=>!r.ok);
@@ -1737,8 +1741,11 @@ async function batchSave(rowIds){
     } else {
       var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveAll',rows:payload})});
       var t=await r.text();
-      var j; try{j=JSON.parse(t);}catch(e){j={ok:true,_parseWarn:true};}
+      var j; try{j=JSON.parse(t);}catch(e){_hasParseWarn=true;j={ok:true,_parseWarn:true};}
       if(!j.ok) throw new Error(j.error||'Ошибка');
+      if(!_hasParseWarn&&j.saved!==undefined&&j.requested!==undefined&&j.saved<j.requested){
+        toast('Внимание: '+(j.requested-j.saved)+' строк не найдено в таблице — проверьте данные','err',7000);
+      }
     }
 
     rowIds.forEach(rid=>{
@@ -1755,8 +1762,13 @@ async function batchSave(rowIds){
       }
       delete MOD[rid];
     });
-    setSt('ok','Сохранено · '+new Date().toLocaleTimeString('ru'));
-    toast('Сохранено '+rowIds.length+(rowIds.length===1?' строк':'а строк'),'ok',1800);
+    if(_hasParseWarn){
+      setSt('err','Проверьте таблицу');
+      toast('Ответ сервера нечитаем — проверьте, сохранились ли данные в таблице','err',6000);
+    } else {
+      setSt('ok','Сохранено · '+new Date().toLocaleTimeString('ru'));
+      toast('Сохранено '+rowIds.length+(rowIds.length===1?' строк':'а строк'),'ok',1800);
+    }
     render();
   }catch(ex){setSt('err','Ошибка: '+ex.message);toast('Ошибка: '+ex.message,'err',4000);}
 }
