@@ -861,7 +861,6 @@ function applyFilters(){
   FM=document.getElementById('fplace').value;
   FL1=document.getElementById('flvl1').value;
   FL2=document.getElementById('flvl2').value;
-  FKP=document.getElementById('fkp').checked;
   render();
 }
 
@@ -870,7 +869,6 @@ function applyFiltersAndTags(){
   FM=document.getElementById('fplace').value;
   FL1=document.getElementById('flvl1').value;
   FL2=document.getElementById('flvl2').value;
-  FKP=document.getElementById('fkp').checked;
   ACTIVE_PRESET=null;
   renderPresetChips();
   renderFilterTags();
@@ -1042,7 +1040,7 @@ function applyPreset(name){
     document.getElementById('fplace').value='';
     document.getElementById('flvl1').value='';
     document.getElementById('flvl2').value='';
-    document.getElementById('fkp').checked=false;
+    FKP=false;
     document.querySelectorAll('#fc .chip').forEach(function(ch){
       ch.classList.toggle('on', ch.dataset.corpus==='');
     });
@@ -1068,7 +1066,7 @@ function applyPreset(name){
   FM=p.place||''; document.getElementById('fplace').value=FM;
   FL1=p.lvl1||''; document.getElementById('flvl1').value=FL1;
   FL2=p.lvl2||''; document.getElementById('flvl2').value=FL2;
-  FKP=!!p.kp; document.getElementById('fkp').checked=FKP;
+  FKP=!!p.kp;
   // Работы
   FW.clear();
   (p.works||[]).forEach(function(w){FW.add(w);});
