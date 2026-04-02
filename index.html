@@ -439,6 +439,10 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <input type="checkbox" id="ffloor" onchange="toggleFloorReadiness(this.checked)">
     Готовность этажей
   </label>
+  <label class="chk-lbl">
+    <input type="checkbox" id="fvol" onchange="SHOW_VOL=this.checked;render();">
+    Показать объемы
+  </label>
   <div class="fsep"></div>
   <span class="fl" style="font-size:11px;">Пресеты:</span>
   <div id="preset-chips" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
@@ -623,7 +627,7 @@ var _contractorTouched = false; // был ли подрядчик изменён
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = []; // порядок строк
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false;
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false;
 var WORKS=[];
 
 function renderWorkDrop(query){
@@ -1334,7 +1338,10 @@ function render(){
       }
 
       var cellContent;
-      if(SHOW_SP){
+      if(SHOW_VOL){
+        var vol=(row.volume||'—')+(row.unit?' '+row.unit:'');
+        cellContent='<div class="c-date" style="font-size:10px;text-align:center;width:100%;">'+e(vol)+'</div>';
+      } else if(SHOW_SP){
         cellContent='<div class="c-date sp">'+(row.org||mod&&mod.org?dl:'<span style="color:var(--ink3)">—</span>')+'</div>';
       } else if(showFactOnly){
         // Нет базового/текущего — только фактическое
