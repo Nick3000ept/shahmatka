@@ -503,6 +503,9 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <div class="si"><span class="sn" id="sb-left">0</span>Осталось</div>
   <div class="si"><span class="sn y" id="sb-start">0</span>Начаты</div>
   <div class="si"><span class="sn r" id="sb-rem">0</span>Замечания</div>
+  <div class="si" id="sb-vol-wrap" style="display:none"><span class="sn" id="sb-vol-total">0</span>Объём итого</div>
+  <div class="si" id="sb-vol-done-wrap" style="display:none"><span class="sn g" id="sb-vol-done">0</span>Объём выполнен</div>
+  <div class="si" id="sb-vol-left-wrap" style="display:none"><span class="sn" id="sb-vol-left">0</span>Объём остаток</div>
   <div class="sh" id="sb-sel-info">Ctrl+клик — мультивыбор · клик по № этажа или работы — выбрать строку/столбец · Esc — снять выбор</div>
 </div>
 
@@ -1387,10 +1390,16 @@ function statusShort(s){
 
 function renderSB(rows){
   var cnt={'s-done':0,'s-started':0,'s-accepted':0,'s-remarks':0,'s-empty':0};
+  var volTotal=0, volDone=0;
   rows.forEach(r=>{
     var mod=MOD[r.rowId];
     var s=mod&&mod.status!==undefined?mod.status:(S2CSS[r.status||'']||'s-empty');
     cnt[s]=(cnt[s]||0)+1;
+    var v=parseFloat(String(r.volume||'').replace(',','.'));
+    if(!isNaN(v)){
+      volTotal+=v;
+      if(s==='s-done'||s==='s-accepted') volDone+=v;
+    }
   });
   var done=cnt['s-done']+cnt['s-accepted'];
   var left=rows.length-done;
@@ -1401,6 +1410,16 @@ function renderSB(rows){
   document.getElementById('sb-rem').textContent=cnt['s-remarks'];
   var hint=SEL.size?'Выбрано: '+SEL.size+' · Esc — снять':'Ctrl+клик — мультивыбор · клик по № этажа или работы — выбрать строку/столбец · Esc — снять выбор';
   document.getElementById('sb-sel-info').textContent=hint;
+  var showVol=SHOW_VOL&&volTotal>0;
+  var fmt=function(v){return v>=1000?(v/1000).toFixed(1).replace('.',',')+' тыс.':Math.round(v)+'';};
+  document.getElementById('sb-vol-wrap').style.display=showVol?'':'none';
+  document.getElementById('sb-vol-done-wrap').style.display=showVol?'':'none';
+  document.getElementById('sb-vol-left-wrap').style.display=showVol?'':'none';
+  if(showVol){
+    document.getElementById('sb-vol-total').textContent=fmt(volTotal);
+    document.getElementById('sb-vol-done').textContent=fmt(volDone);
+    document.getElementById('sb-vol-left').textContent=fmt(volTotal-volDone);
+  }
 }
 
 function renderUnsaved(){
@@ -1635,9 +1654,7 @@ function openPanel(rowId, anchorEl){
   document.getElementById('po-multi').classList.toggle('on',isMulti);
   document.getElementById('po-multi-cnt').textContent=SEL.size;
 
-  var workTitle=row.work||'Работа';
-  if(!isMulti&&(row.volume||row.unit)) workTitle+=' '+[row.volume,row.unit].filter(Boolean).join(' ');
-  document.getElementById('po-title').textContent=isMulti?(SEL.size+' ячеек'):workTitle;
+  document.getElementById('po-title').textContent=isMulti?(SEL.size+' ячеек'):(row.work||'Работа');
   var sub=isMulti?'':((row.corpus?'Корпус '+row.corpus:'')+(row.place?' · '+row.place:'')+(row.lvl2?' · '+row.lvl2:'')+(row.floor?' · Этаж '+row.floor:'')+(row.org?' · '+row.org:''));
   document.getElementById('po-sub').textContent=sub;
 
