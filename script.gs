@@ -193,7 +193,7 @@ function getRows(filterCorpus) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return {rows: []};
   var dict = getWorkDict();
-  var values = sheet.getRange(2, 1, lastRow - 1, 16).getValues();
+  var values = sheet.getRange(2, 1, lastRow - 1, 18).getValues();
   var rows = [];
   for (var i = 0; i < values.length; i++) {
     var row = values[i];
@@ -223,7 +223,9 @@ function getRows(filterCorpus) {
       kp         : attrs.kp,
       factNum    : attrs.factNum,
       baseDate   : formatDateOut(row[14]),
-      currentDate: formatDateOut(row[15])
+      currentDate: formatDateOut(row[15]),
+      volume     : String(row[16]).trim(),
+      unit       : String(row[17]).trim()
     });
   }
   rows.sort(function(a, b) {

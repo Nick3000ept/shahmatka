@@ -1628,7 +1628,9 @@ function openPanel(rowId, anchorEl){
   document.getElementById('po-multi').classList.toggle('on',isMulti);
   document.getElementById('po-multi-cnt').textContent=SEL.size;
 
-  document.getElementById('po-title').textContent=isMulti?(SEL.size+' ячеек'):(row.work||'Работа');
+  var workTitle=row.work||'Работа';
+  if(!isMulti&&(row.volume||row.unit)) workTitle+=' '+[row.volume,row.unit].filter(Boolean).join(' ');
+  document.getElementById('po-title').textContent=isMulti?(SEL.size+' ячеек'):workTitle;
   var sub=isMulti?'':((row.corpus?'Корпус '+row.corpus:'')+(row.place?' · '+row.place:'')+(row.lvl2?' · '+row.lvl2:'')+(row.floor?' · Этаж '+row.floor:'')+(row.org?' · '+row.org:''));
   document.getElementById('po-sub').textContent=sub;
 
