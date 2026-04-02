@@ -438,6 +438,10 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <input type="checkbox" id="fsp" onchange="toggleSP(this.checked)">
     Показать СП
   </label>
+  <label class="chk-lbl">
+    <input type="checkbox" id="ffloor" onchange="toggleFloorReadiness(this.checked)">
+    Готовность этажей
+  </label>
   <div class="fsep"></div>
   <span class="fl" style="font-size:11px;">Пресеты:</span>
   <div id="preset-chips" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
@@ -622,7 +626,7 @@ var _contractorTouched = false; // был ли подрядчик изменён
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = []; // порядок строк
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false;
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false;
 var WORKS=[];
 
 function renderWorkDrop(query){
@@ -900,6 +904,80 @@ function toggleSP(on){
   SHOW_SP=on;
   render();
 }
+
+function toggleFloorReadiness(on){
+  FLOOR_READINESS=on;
+  render();
+}
+
+function renderFloorReadiness(rows){
+  var board=document.getElementById('board');
+  var empty=document.getElementById('empty');
+
+  if(!rows.length){
+    board.style.display='none'; empty.style.display='flex';
+    empty.querySelector('.empty-ttl').textContent=ROWS.length?'Нет строк по фильтру':'Нет данных';
+    renderSB([]);return;
+  }
+
+  // Уникальные корпуса (столбцы)
+  var corpSet={};
+  rows.forEach(r=>{ corpSet[r.corpus]=true; });
+  var corpora=Object.keys(corpSet).sort(function(a,b){return a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'});});
+
+  // Уникальные этажи (строки), по убыванию
+  var floorSet={};
+  rows.forEach(r=>{ var f=parseFloat(String(r.floor).replace(',','.')); if(!isNaN(f)) floorSet[f]=r.floor; });
+  var floors=Object.keys(floorSet).map(Number).sort(function(a,b){return b-a;});
+
+  // Считаем готовность: {floor|corpus} → {done, total}
+  var stats={};
+  rows.forEach(r=>{
+    var f=parseFloat(String(r.floor).replace(',','.'));
+    if(isNaN(f)) return;
+    var key=f+'|||'+r.corpus;
+    if(!stats[key]) stats[key]={done:0,total:0};
+    stats[key].total++;
+    var mod=MOD[r.rowId];
+    var s=mod&&mod.status!==undefined?mod.status:(S2CSS[r.status||'']||'s-empty');
+    if(s==='s-done'||s==='s-accepted') stats[key].done++;
+  });
+
+  // Строим таблицу
+  var h='<thead><tr>';
+  h+='<th class="corner"><div class="corner-lbl">Этаж</div></th>';
+  corpora.forEach(function(c){
+    h+='<th style="position:sticky;top:0;background:var(--bg2);font-family:var(--mono);font-size:11px;font-weight:700;text-align:center;padding:4px 8px;border-bottom:2px solid var(--brd2);border-right:1px solid var(--brd);white-space:nowrap;">'+e(c)+'</th>';
+  });
+  h+='</tr></thead><tbody>';
+
+  floors.forEach(function(fl){
+    h+='<tr>';
+    h+='<td style="position:sticky;left:0;background:var(--bg2);font-family:var(--mono);font-size:12px;font-weight:700;text-align:center;padding:4px 8px;border-right:2px solid var(--brd2);border-bottom:1px solid var(--brd);min-width:40px;">'+fl+'</td>';
+    corpora.forEach(function(c){
+      var key=fl+'|||'+c;
+      var st=stats[key];
+      if(!st){
+        h+='<td style="text-align:center;border-right:1px solid var(--brd);border-bottom:1px solid var(--brd);background:var(--bg2);color:var(--ink3);font-size:11px;">—</td>';
+        return;
+      }
+      var pct=st.total>0?Math.round(st.done/st.total*100):0;
+      var bg=pct===100?'#dcfce7':pct>=75?'#d1fae5':pct>=50?'#fef9c3':pct>=25?'#fef3c7':pct>0?'#fee2e2':'var(--bg)';
+      var clr=pct===100?'#15803d':pct>=50?'#92400e':'#991b1b';
+      if(pct===0) clr='var(--ink3)';
+      h+='<td style="text-align:center;border-right:1px solid var(--brd);border-bottom:1px solid var(--brd);background:'+bg+';padding:6px 8px;min-width:72px;">'
+        +'<div style="font-family:var(--mono);font-size:13px;font-weight:700;color:'+clr+';">'+pct+'%</div>'
+        +'<div style="font-size:10px;color:var(--ink3);margin-top:1px;">'+st.done+'/'+st.total+'</div>'
+        +'</td>';
+    });
+    h+='</tr>';
+  });
+  h+='</tbody>';
+
+  board.style.display='table'; empty.style.display='none';
+  board.innerHTML=h;
+  renderSB(rows);
+}
 function setFDate(v){
   FDATE=v;
   render();
@@ -1036,6 +1114,8 @@ function render(){
     }
     return true;
   });
+
+  if(FLOOR_READINESS){ renderFloorReadiness(rows); return; }
 
   if(!rows.length){
     board.style.display='none'; empty.style.display='flex';
