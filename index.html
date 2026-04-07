@@ -480,7 +480,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <div class="ms-sep admin-only" id="ms-contr-sep"></div>
   <button class="ms-apply" onclick="msCommit()">💾 Сохранить в таблицу</button>
   <div class="ms-preview" id="ms-preview"></div>
-  <button class="ms-clear" onclick="clearSel();resetMsDraft()">✕ Снять выбор</button>
+  <button class="ms-clear" onclick="clearSel(true);resetMsDraft()">✕ Снять выбор</button>
 </div>
 
 <!-- HINT -->
@@ -727,7 +727,7 @@ window.onload=function(){
   setTimeout(loadContractors, 1500);
   document.addEventListener('keydown',function(e){
     if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveAll();}
-    if(e.key==='Escape'){clearSel();closePanel();}
+    if(e.key==='Escape'){clearSel(true);closePanel();}
   });
   // Клик вне попапа — закрываем
   document.addEventListener('mousedown',function(ev){
@@ -1523,7 +1523,20 @@ function isColSelected(colIdx){
   return rowIds.length&&rowIds.every(rid=>SEL.has(rid));
 }
 
-function clearSel(){
+function hasMsDraft(){
+  if(MS_DRAFT.status!==null||MS_DRAFT.pct!==null) return true;
+  var di=document.getElementById('ms-date');
+  if(di&&di.value) return true;
+  var ci=document.getElementById('ms-contractor');
+  if(ci&&ci.value) return true;
+  return false;
+}
+
+function clearSel(force){
+  if(!force&&SEL.size>1&&hasMsDraft()){
+    toast('Изменения в мультивыборе не применены — нажмите 💾 или отмените выбор','err',4000);
+    return;
+  }
   SEL.clear();
   updateCellSel();
   updateMsBar();
