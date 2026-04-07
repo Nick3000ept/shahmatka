@@ -282,6 +282,28 @@ function saveOneRow(data) {
     sheet.getRange(targetRowSheet, 8, 1, 7).setValues([rowValues.slice(1)]);
   }
   SpreadsheetApp.flush();
+
+  // Верификация: перечитываем и повторяем запись если данные не применились
+  var verify = sheet.getRange(targetRowSheet, EDIT_START, 1, EDIT_COLS).getValues()[0];
+  var mismatch = false;
+  if (data.dateEnd !== undefined) {
+    var written = verify[C.DATE_END - off];
+    var writtenStr = written instanceof Date ? Utilities.formatDate(written, Session.getScriptTimeZone(), 'dd.MM.yyyy') : String(written).trim();
+    var expectedStr = data.dateEnd || '';
+    if (writtenStr !== expectedStr) mismatch = true;
+  }
+  if (!mismatch && data.status !== undefined) {
+    if (String(verify[C.STATUS - off]).trim() !== (data.status || '')) mismatch = true;
+  }
+  if (mismatch) {
+    Utilities.sleep(500);
+    try {
+      sheet.getRange(targetRowSheet, EDIT_START, 1, EDIT_COLS).setValues([rowValues]);
+    } catch(e2) {
+      sheet.getRange(targetRowSheet, 8, 1, 7).setValues([rowValues.slice(1)]);
+    }
+    SpreadsheetApp.flush();
+  }
 }
 
 function findSheet(ss) {
