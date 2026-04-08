@@ -2119,7 +2119,7 @@ function renderAnalytics(){
   works.forEach(w=>{totalWeek+=byWork[w].week;totalMonth+=byWork[w].month;totalPlan+=byWork[w].plan;});
 
   var h='<table class="an-table">';
-  h+='<thead><tr><th>Работа</th><th class="r">7 дн</th><th class="r">30 дн</th><th class="r">Факт</th><th class="r">План</th></tr></thead><tbody>';
+  h+='<thead><tr><th>Работа</th><th class="r">7 дн</th><th class="r">30 дн</th><th class="r">Факт</th><th class="r">План</th><th class="r">Откл.</th></tr></thead><tbody>';
   var curPlace='__NONE__';
   var idx=0;
   works.forEach(w=>{
@@ -2134,22 +2134,28 @@ function renderAnalytics(){
     h+='<td class="r"><span class="an-num'+(d.week===0?' zero':'')+'">'+d.week+'</span></td>';
     h+='<td class="r"><span class="an-num'+(d.month===0?' zero':'')+'">'+d.month+'</span></td>';
     h+='<td class="r"><span class="an-num">'+d.total+'</span></td>';
-    h+='<td class="r" style="color:var(--ink3);font-size:11px;">'+d.plan+'</td></tr>';
+    var dev=d.total-d.plan;
+    h+='<td class="r" style="color:var(--ink3);font-size:11px;">'+d.plan+'</td>';
+    h+='<td class="r" style="font-weight:600;color:'+(dev<0?'var(--red)':dev>0?'var(--green)':'var(--ink3)')+';">'+(dev>0?'+':'')+dev+'</td></tr>';
     // Строки корпусов (скрыты)
     var corps=Object.keys(d.corpora).sort();
     corps.forEach(c=>{
       var cd=d.corpora[c];
+      var cdev=cd.total-cd.plan;
       h+='<tr class="an-detail an-d-'+idx+'" style="display:none">';
       h+='<td style="padding-left:28px;font-size:10px;">'+e(c)+'</td>';
       h+='<td class="r"><span class="an-num'+(cd.week===0?' zero':'')+'">'+cd.week+'</span></td>';
       h+='<td class="r"><span class="an-num'+(cd.month===0?' zero':'')+'">'+cd.month+'</span></td>';
       h+='<td class="r"><span class="an-num'+(cd.total===0?' zero':'')+'">'+cd.total+'</span></td>';
-      h+='<td class="r" style="color:var(--ink3);">'+cd.plan+'</td></tr>';
+      h+='<td class="r" style="color:var(--ink3);">'+cd.plan+'</td>';
+      h+='<td class="r" style="font-weight:600;color:'+(cdev<0?'var(--red)':cdev>0?'var(--green)':'var(--ink3)')+';">'+(cdev>0?'+':'')+cdev+'</td></tr>';
     });
     idx++;
   });
+  var totalDev=totalDone-totalPlan;
   h+='</tbody><tfoot><tr class="an-foot"><td style="font-weight:600;">Итого</td>';
   h+='<td class="r">'+totalWeek+'</td><td class="r">'+totalMonth+'</td><td class="r">'+totalDone+'</td><td class="r" style="color:var(--ink3);">'+totalPlan+'</td>';
+  h+='<td class="r" style="font-weight:700;color:'+(totalDev<0?'var(--red)':totalDev>0?'var(--green)':'var(--ink3)')+';">'+(totalDev>0?'+':'')+totalDev+'</td>';
   h+='</tr></tfoot></table>';
   document.getElementById('an-body').innerHTML=h;
 }
