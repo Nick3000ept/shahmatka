@@ -2050,7 +2050,8 @@ function renderAnalytics(){
 
   // Отчётная дата
   var todayD=new Date(now);
-  var todayStr=pad(todayD.getDate())+'.'+pad(todayD.getMonth()+1)+'.'+todayD.getFullYear();
+  var p2=function(n){return n<10?'0'+n:String(n);};
+  var todayStr=p2(todayD.getDate())+'.'+p2(todayD.getMonth()+1)+'.'+todayD.getFullYear();
   document.getElementById('an-date').textContent='на '+todayStr;
 
   rows.forEach(r=>{
