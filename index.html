@@ -411,8 +411,6 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <div class="sep"></div>
   <div class="sync-dot" id="sdot"></div>
   <span class="sync-txt" id="stxt">Не подключено</span>
-  <span class="fl admin-only" style="font-size:11px;color:var(--ink3);">📅</span>
-  <input type="date" class="url-input admin-only" id="fdate-inp" title="Показать работы до даты" style="width:130px;font-size:11px;" oninput="setFDate(this.value)">
   <div class="tb-right">
     <span class="unsaved" id="ubadge"></span>
     <button class="btn" id="show-mod-btn" style="display:none;font-size:11px;" onclick="toggleFMod()">Посмотреть изменения</button>
@@ -471,6 +469,14 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <label class="chk-lbl">
     <input type="checkbox" id="fvol" onchange="SHOW_VOL=this.checked;render();">
     Показать объемы
+  </label>
+  <label class="chk-lbl">
+    <input type="checkbox" id="fplan7" onchange="FPLAN7=this.checked;render();">
+    План на 7 дней
+  </label>
+  <label class="chk-lbl">
+    <input type="checkbox" id="fplan30" onchange="FPLAN30=this.checked;render();">
+    План на 30 дней
   </label>
   <div class="fsep"></div>
   <span class="fl" style="font-size:11px;">Пресеты:</span>
@@ -659,7 +665,7 @@ var _contractorTouched = false; // был ли подрядчик изменён
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = []; // порядок строк
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false;
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false;
 var WORKS=[];
 
 function renderWorkDrop(query){
@@ -1135,6 +1141,14 @@ function render(){
       if(!minD) return false; // строки без дат скрываем
       var hasDateBefore=(d1&&d1<=fdateMs)||(d2&&d2<=fdateMs)||(d3&&d3<=fdateMs);
       if(!hasDateBefore) return false;
+    }
+    // Фильтры плана по текущей дате окончания
+    if(FPLAN7||FPLAN30){
+      var dCur=r.currentDate?parseDateMs(fmtDate(r.currentDate)):0;
+      if(!dCur) return false;
+      var today=Date.now();
+      var ok=(FPLAN7&&dCur<=today+7*24*3600*1000)||(FPLAN30&&dCur<=today+30*24*3600*1000);
+      if(!ok) return false;
     }
     return true;
   });
