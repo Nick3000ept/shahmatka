@@ -2101,7 +2101,7 @@ function renderAnalytics(){
     }
   });
 
-  document.getElementById('an-sub').textContent='Отфильтровано: '+totalAll+' поз. · выполнено: '+totalDone;
+  document.getElementById('an-sub').textContent='';
 
   var works=Object.keys(byWork).filter(w=>byWork[w].total>0).sort((a,b)=>{
     var da=byWork[a],db=byWork[b];
@@ -2152,11 +2152,7 @@ function renderAnalytics(){
     });
     idx++;
   });
-  var totalDev=totalDone-totalPlan;
-  h+='</tbody><tfoot><tr class="an-foot"><td style="font-weight:600;">Итого</td>';
-  h+='<td class="r">'+totalWeek+'</td><td class="r">'+totalMonth+'</td><td class="r">'+totalDone+'</td><td class="r" style="color:var(--ink3);">'+totalPlan+'</td>';
-  h+='<td class="r" style="font-weight:700;color:'+(totalDev<0?'var(--red)':totalDev>0?'var(--green)':'var(--ink3)')+';">'+(totalDev>0?'+':'')+totalDev+'</td>';
-  h+='</tr></tfoot></table>';
+  h+='</tbody></table>';
   document.getElementById('an-body').innerHTML=h;
 }
 function toggleAnDetail(idx){
