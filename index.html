@@ -1703,12 +1703,20 @@ function msCommit(){
   var hasChanges=MS_DRAFT.status!==null||MS_DRAFT.pct!==null||document.getElementById('ms-date').value||contrVal;
   if(!hasChanges){toast('Ничего не выбрано','inf');return;}
   var dateVal=document.getElementById('ms-date').value;
+  var _td2=new Date(),_p2b=function(n){return n<10?'0'+n:String(n);};
+  var _today2=_p2b(_td2.getDate())+'.'+_p2b(_td2.getMonth()+1)+'.'+_td2.getFullYear();
   SEL.forEach(rid=>{
     if(!MOD[rid]) MOD[rid]={};
     if(MS_DRAFT.status!==null) MOD[rid].status=MS_DRAFT.status;
     if(MS_DRAFT.pct!==null) MOD[rid].pct=(parseInt(MS_DRAFT.pct)/100).toFixed(2).replace('.',',');
     if(dateVal) MOD[rid].dateEnd=fmtDate(dateVal);
     if(contrVal) MOD[rid].org=contrVal;
+    // Автодата: если статус "окончены/передано" и дата окончания пустая — ставим сегодня
+    var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS.find(r=>r.rowId===rid)||{}).status||'']||'s-empty');
+    if((finalSt==='s-done'||finalSt==='s-accepted')&&!MOD[rid].dateEnd){
+      var origRow=ROWS.find(r=>r.rowId===rid);
+      if(!origRow||!origRow.dateEnd) MOD[rid].dateEnd=_today2;
+    }
   });
   resetMsDraft();
   clearSel();
@@ -1853,6 +1861,8 @@ function savePanel(){
   var contractor=document.getElementById('p-contractor').value;
   var targets=[...SEL];
   if(!targets.length&&CUR) targets=[CUR.rowId];
+  var _td=new Date(),_p2=function(n){return n<10?'0'+n:String(n);};
+  var _today=_p2(_td.getDate())+'.'+_p2(_td.getMonth()+1)+'.'+_td.getFullYear();
   targets.forEach(rid=>{
     if(!MOD[rid]) MOD[rid]={};
     // Пишем только явно изменённые поля — защита от случайной перезаписи
@@ -1861,6 +1871,12 @@ function savePanel(){
     if(_dateTouched)       MOD[rid].dateEnd=dateEnd;
     if(_commentTouched)    MOD[rid].comment=comment;
     if(_contractorTouched) MOD[rid].org=contractor;
+    // Автодата: если статус "окончены/передано" и дата окончания пустая — ставим сегодня
+    var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS.find(r=>r.rowId===rid)||{}).status||'']||'s-empty');
+    if((finalSt==='s-done'||finalSt==='s-accepted')&&!MOD[rid].dateEnd){
+      var origRow=ROWS.find(r=>r.rowId===rid);
+      if(!origRow||!origRow.dateEnd) MOD[rid].dateEnd=_today;
+    }
     // Если ничего не изменилось — не добавлять в очередь на сохранение
     if(Object.keys(MOD[rid]).length===0) delete MOD[rid];
   });
