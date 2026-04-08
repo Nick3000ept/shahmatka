@@ -688,7 +688,6 @@ function updateWorkInp(){
   renderFilterTags();
 }
 
-var _workDropClicking=false;
 function showWorkDrop(){
   var drop=document.getElementById('work-drop');
   var inp=document.getElementById('work-search-inp');
@@ -776,12 +775,6 @@ function renderContractorSelect(selected){
   });
 }
 
-var CUR_CONTRACTOR='';
-function selContractor(name, el){
-  CUR_CONTRACTOR=name;
-  document.querySelectorAll('#contractor-chips .contr-chip').forEach(c=>c.classList.remove('on'));
-  el.classList.add('on');
-}
 function reload(){if(BASE)loadData();else toast('Сначала подключитесь','err');}
 
 // ─── LOAD ─────────────────────────────────────────────────────────
@@ -1704,7 +1697,6 @@ function openPanel(rowId, anchorEl){
 
   // Подрядчик
   var contractor=mod.org!==undefined?mod.org:(row.org||'');
-  CUR_CONTRACTOR=contractor;
   renderContractorSelect(contractor);
 
   _pctTouched=false;

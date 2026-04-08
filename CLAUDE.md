@@ -214,7 +214,6 @@ O+= не трогать никогда (P(15)=baseDate, Q(16)=currentDate — т
 ### Данные / загрузка
 - `loadContractors()` — загружает список подрядчиков из GAS, кэширует в localStorage
 - `renderContractorSelect(selected)` — обновляет `<select#p-contractor>` в попапе
-- `selContractor(name, el)` — выбирает подрядчика по чипу
 - `reload()` — вызывает loadData()
 - `loadData()` — главная загрузка: fetch getRows → ROWS → buildFilters() → render()
 
