@@ -2048,6 +2048,11 @@ function renderAnalytics(){
   var byWork={};
   var totalAll=rows.length,totalDone=0;
 
+  // Отчётная дата
+  var todayD=new Date(now);
+  var todayStr=pad(todayD.getDate())+'.'+pad(todayD.getMonth()+1)+'.'+todayD.getFullYear();
+  document.getElementById('an-date').textContent='на '+todayStr;
+
   rows.forEach(r=>{
     var mod=MOD[r.rowId];
     var s=mod&&mod.status!==undefined?mod.status:(S2CSS[r.status||'']||'s-empty');
@@ -2056,8 +2061,9 @@ function renderAnalytics(){
     var corp=r.corpus||'?';
     if(!byWork[work]) byWork[work]={week:0,month:0,total:0,plan:0,place:r.place||'',lvl2:r.lvl2||'',corpora:{}};
     if(!byWork[work].corpora[corp]) byWork[work].corpora[corp]={week:0,month:0,total:0,plan:0};
-    byWork[work].plan++;
-    byWork[work].corpora[corp].plan++;
+    // План: строки с базовой датой окончания <= сегодня
+    var bMs=r.baseDate?parseDateMs(fmtDate(r.baseDate)):0;
+    if(bMs&&bMs<=now){byWork[work].plan++;byWork[work].corpora[corp].plan++;}
     if(!isDone) return;
     totalDone++;
     byWork[work].total++;
@@ -2111,9 +2117,9 @@ function renderAnalytics(){
       var cd=d.corpora[c];
       h+='<tr class="an-detail an-d-'+idx+'" style="display:none">';
       h+='<td style="padding-left:28px;font-size:10px;">'+e(c)+'</td>';
-      h+='<td class="r">'+(cd.week||0)+'</td>';
-      h+='<td class="r">'+(cd.month||0)+'</td>';
-      h+='<td class="r">'+cd.total+'</td>';
+      h+='<td class="r"><span class="an-num'+(cd.week===0?' zero':'')+'">'+cd.week+'</span></td>';
+      h+='<td class="r"><span class="an-num'+(cd.month===0?' zero':'')+'">'+cd.month+'</span></td>';
+      h+='<td class="r"><span class="an-num'+(cd.total===0?' zero':'')+'">'+cd.total+'</span></td>';
       h+='<td class="r" style="color:var(--ink3);">'+cd.plan+'</td></tr>';
     });
     idx++;
@@ -2139,7 +2145,7 @@ function toggleAnDetail(idx){
 <div id="analytics-panel" class="an-panel">
   <div class="an-head">
     <div>
-      <div class="an-title">Аналитика выполнения</div>
+      <div class="an-title">Аналитика выполнения <span id="an-date" style="font-size:11px;font-weight:400;color:var(--ink3);margin-left:6px;font-family:var(--mono);"></span></div>
       <div class="an-sub" id="an-sub">По отфильтрованным данным</div>
     </div>
     <button class="btn" onclick="closeAnalytics()" style="padding:3px 9px;font-size:12px;flex-shrink:0;">✕</button>
