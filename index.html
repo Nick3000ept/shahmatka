@@ -104,6 +104,33 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .pwd-err{font-size:11px;color:var(--red);min-height:14px;}
 .pwd-btns{display:flex;gap:8px;justify-content:flex-end;}
 
+/* ── ANALYTICS PANEL ── */
+.an-panel{display:none;position:fixed;top:0;right:0;width:480px;max-width:96vw;height:100vh;background:var(--bg2);border-left:1px solid var(--brd);z-index:490;flex-direction:column;box-shadow:-6px 0 28px rgba(0,0,0,.1);}
+.an-panel.on{display:flex;}
+.an-head{display:flex;align-items:flex-start;justify-content:space-between;padding:13px 16px 11px;border-bottom:1px solid var(--brd);flex-shrink:0;gap:8px;}
+.an-title{font-size:13px;font-weight:600;color:var(--ink);}
+.an-sub{font-size:10px;color:var(--ink3);margin-top:3px;line-height:1.4;}
+.an-body{overflow-y:auto;flex:1;padding:0;}
+.an-body::-webkit-scrollbar{width:4px;}
+.an-body::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px;}
+.an-sum{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--brd);flex-wrap:wrap;}
+.an-sum-card{flex:1;min-width:80px;padding:8px 12px;border-radius:6px;background:var(--bg3);border:1px solid var(--brd);}
+.an-sum-val{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--acc);line-height:1;}
+.an-sum-lbl{font-size:9px;color:var(--ink3);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;}
+.an-note{padding:6px 16px;font-size:9px;color:var(--ink3);border-bottom:1px solid var(--brd);font-style:italic;}
+.an-table{width:100%;border-collapse:collapse;font-size:11px;}
+.an-table th{text-align:left;padding:6px 10px;font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;border-bottom:2px solid var(--brd2);position:sticky;top:0;background:var(--bg2);z-index:2;}
+.an-table th.r{text-align:right;}
+.an-table td{padding:6px 10px;border-bottom:1px solid var(--brd);vertical-align:middle;color:var(--ink);}
+.an-table td.r{text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;}
+.an-table tr:last-child td{border-bottom:none;}
+.an-table tbody tr:hover td{background:var(--bg3);}
+.an-num{color:var(--acc);}
+.an-num.zero{color:var(--ink3);font-weight:400;}
+.an-foot{background:var(--bg3)!important;font-weight:700;border-top:2px solid var(--brd2)!important;}
+.an-foot td{border-bottom:none!important;}
+.an-empty{padding:48px 24px;text-align:center;color:var(--ink3);font-size:12px;}
+
 /* ── HINT BAR ── */
 
 /* ── BOARD WRAP ── */
@@ -453,6 +480,8 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <button class="preset-btn ok" onclick="savePreset()">OK</button>
     <button class="preset-btn cancel" onclick="presetCancelClick()">✕</button>
   </div>
+  <div class="fsep"></div>
+  <button class="btn" id="an-btn" onclick="toggleAnalytics()" style="font-size:11px;">📊 Аналитика</button>
 </div>
 
 <!-- MULTISELECT BAR -->
@@ -1370,6 +1399,7 @@ function render(){
   renderSB(rows);
   renderUnsaved();
   updateMsBar();
+  renderAnalytics();
 }
 
 function statusShort(s){
@@ -1962,7 +1992,106 @@ function showLoader(txt){document.getElementById('loader').classList.add('on');d
 function hideLoader(){document.getElementById('loader').classList.remove('on');}
 function toast(msg,tp,dur){var w=document.getElementById('toasts'),el=document.createElement('div');el.className='toast '+(tp||'inf');el.textContent=msg;w.appendChild(el);setTimeout(()=>el.remove(),dur||2800);}
 function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ─── ANALYTICS ────────────────────────────────────────────────────
+var ANALYTICS_OPEN=false;
+function toggleAnalytics(){
+  ANALYTICS_OPEN=!ANALYTICS_OPEN;
+  document.getElementById('analytics-panel').classList.toggle('on',ANALYTICS_OPEN);
+  document.getElementById('an-btn').classList.toggle('btn-pri',ANALYTICS_OPEN);
+  if(ANALYTICS_OPEN) renderAnalytics();
+}
+function closeAnalytics(){
+  ANALYTICS_OPEN=false;
+  document.getElementById('analytics-panel').classList.remove('on');
+  document.getElementById('an-btn').classList.remove('btn-pri');
+}
+function renderAnalytics(){
+  if(!ANALYTICS_OPEN) return;
+  var fdateMs=FDATE?new Date(FDATE).getTime():0;
+  var rows=ROWS.filter(r=>{
+    if(FC.size>0&&!FC.has(r.corpus)) return false;
+    if(FO&&r.org!==FO) return false;
+    if(FM&&r.place!==FM) return false;
+    if(FL1&&r.lvl1!==FL1) return false;
+    if(FL2&&r.lvl2!==FL2) return false;
+    if(FW.size>0&&!FW.has(r.work)) return false;
+    if(FKP&&!r.kp) return false;
+    if(FMOD&&!MOD[r.rowId]) return false;
+    if(fdateMs){
+      var d1=r.baseDate?parseDateMs(fmtDate(r.baseDate)):0;
+      var d2=r.dateEnd?parseDateMs(fmtDate(r.dateEnd)):0;
+      var d3=r.currentDate?parseDateMs(fmtDate(r.currentDate)):0;
+      var hasDateBefore=(d1&&d1<=fdateMs)||(d2&&d2<=fdateMs)||(d3&&d3<=fdateMs);
+      if(!hasDateBefore) return false;
+    }
+    return true;
+  });
+
+  var now=Date.now();
+  var weekMs=7*24*3600*1000;
+  var monthMs=30*24*3600*1000;
+  var byWork={};
+  var totalAll=rows.length,totalDone=0,totalWeek=0,totalMonth=0;
+  rows.forEach(r=>{
+    var mod=MOD[r.rowId];
+    var s=mod&&mod.status!==undefined?mod.status:(S2CSS[r.status||'']||'s-empty');
+    var isDone=s==='s-done'||s==='s-accepted';
+    var work=r.work||'—';
+    if(!byWork[work]) byWork[work]={week:0,month:0,total:0};
+    if(!isDone) return;
+    totalDone++;
+    byWork[work].total++;
+    var dateEnd=mod&&mod.dateEnd!==undefined?mod.dateEnd:(r.dateEnd||'');
+    var dMs=dateEnd?parseDateMs(dateEnd):0;
+    if(dMs&&dMs<=now){
+      var age=now-dMs;
+      if(age<=weekMs){byWork[work].week++;totalWeek++;}
+      if(age<=monthMs){byWork[work].month++;totalMonth++;}
+    }
+  });
+
+  document.getElementById('an-sub').textContent='Отфильтровано: '+totalAll+' поз. · выполнено: '+totalDone;
+  document.getElementById('an-sum').innerHTML=
+    '<div class="an-sum-card"><div class="an-sum-val">'+totalWeek+'</div><div class="an-sum-lbl">За 7 дней</div></div>'+
+    '<div class="an-sum-card"><div class="an-sum-val">'+totalMonth+'</div><div class="an-sum-lbl">За 30 дней</div></div>'+
+    '<div class="an-sum-card"><div class="an-sum-val">'+totalDone+'</div><div class="an-sum-lbl">Итого выполнено</div></div>'+
+    '<div class="an-sum-card"><div class="an-sum-val">'+totalAll+'</div><div class="an-sum-lbl">Всего позиций</div></div>';
+
+  var works=Object.keys(byWork).sort((a,b)=>byWork[b].total-byWork[a].total);
+  if(!works.length){
+    document.getElementById('an-body').innerHTML='<div class="an-empty">Нет выполненных позиций по текущему фильтру</div>';
+    return;
+  }
+  var h='<table class="an-table">';
+  h+='<thead><tr><th>Работа</th><th class="r">7 дней</th><th class="r">30 дней</th><th class="r">Итого</th></tr></thead><tbody>';
+  works.forEach(w=>{
+    var d=byWork[w];
+    h+='<tr><td style="max-width:240px;word-break:break-word;line-height:1.35;">'+e(w)+'</td>';
+    h+='<td class="r"><span class="an-num'+(d.week===0?' zero':'')+'">'+d.week+'</span></td>';
+    h+='<td class="r"><span class="an-num'+(d.month===0?' zero':'')+'">'+d.month+'</span></td>';
+    h+='<td class="r"><span class="an-num'+(d.total===0?' zero':'')+'">'+d.total+'</span></td></tr>';
+  });
+  h+='</tbody><tfoot><tr class="an-foot"><td style="font-weight:600;">Итого</td>';
+  h+='<td class="r">'+totalWeek+'</td><td class="r">'+totalMonth+'</td><td class="r">'+totalDone+'</td></tr></tfoot></table>';
+  document.getElementById('an-body').innerHTML=h;
+}
 </script>
+
+<!-- ANALYTICS PANEL -->
+<div id="analytics-panel" class="an-panel">
+  <div class="an-head">
+    <div>
+      <div class="an-title">Аналитика выполнения</div>
+      <div class="an-sub" id="an-sub">По отфильтрованным данным</div>
+    </div>
+    <button class="btn" onclick="closeAnalytics()" style="padding:3px 9px;font-size:12px;flex-shrink:0;">✕</button>
+  </div>
+  <div class="an-sum" id="an-sum"></div>
+  <div class="an-note">Учитываются только статусы «СМР окончены» и «Передано». За неделю/месяц — по дате окончания.</div>
+  <div class="an-body" id="an-body"></div>
+</div>
+
 </div>
 </body>
 </html>
