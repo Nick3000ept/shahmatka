@@ -113,11 +113,20 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .an-body{overflow-y:auto;flex:1;padding:0;}
 .an-body::-webkit-scrollbar{width:4px;}
 .an-body::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px;}
-.an-sum{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--brd);flex-wrap:wrap;}
-.an-sum-card{flex:1;min-width:80px;padding:8px 12px;border-radius:6px;background:var(--bg3);border:1px solid var(--brd);}
-.an-sum-val{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--acc);line-height:1;}
-.an-sum-lbl{font-size:9px;color:var(--ink3);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;}
 .an-note{padding:6px 16px;font-size:9px;color:var(--ink3);border-bottom:1px solid var(--brd);font-style:italic;}
+.an-grp-hdr td{background:var(--bg3)!important;font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;padding:6px 10px;border-bottom:1px solid var(--brd2);border-top:2px solid var(--brd2);}
+.an-work-row{cursor:pointer;}
+.an-work-row:hover td{background:var(--bg3)!important;}
+.an-detail{background:#f0f4ff;}
+.an-detail>td{padding:0!important;border-bottom:1px solid var(--brd2)!important;}
+.an-detail-wrap{padding:5px 10px 7px 24px;}
+.an-corp-table{width:100%;border-collapse:collapse;font-size:10px;}
+.an-corp-table th{text-align:left;padding:3px 8px;color:var(--ink3);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--brd);}
+.an-corp-table th.r{text-align:right;}
+.an-corp-table td{padding:3px 8px;border-bottom:1px solid var(--brd);color:var(--ink2);}
+.an-corp-table td.r{text-align:right;font-family:var(--mono);font-weight:600;color:var(--ink);}
+.an-corp-table tr:last-child td{border-bottom:none;}
+.an-corp-foot td{background:var(--bg3)!important;font-weight:700;border-top:1px solid var(--brd2)!important;color:var(--ink)!important;}
 .an-table{width:100%;border-collapse:collapse;font-size:11px;}
 .an-table th{text-align:left;padding:6px 10px;font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;border-bottom:2px solid var(--brd2);position:sticky;top:0;background:var(--bg2);z-index:2;}
 .an-table th.r{text-align:right;}
@@ -2032,49 +2041,93 @@ function renderAnalytics(){
   var weekMs=7*24*3600*1000;
   var monthMs=30*24*3600*1000;
   var byWork={};
-  var totalAll=rows.length,totalDone=0,totalWeek=0,totalMonth=0;
+  var totalAll=rows.length,totalDone=0;
+
   rows.forEach(r=>{
     var mod=MOD[r.rowId];
     var s=mod&&mod.status!==undefined?mod.status:(S2CSS[r.status||'']||'s-empty');
     var isDone=s==='s-done'||s==='s-accepted';
     var work=r.work||'—';
-    if(!byWork[work]) byWork[work]={week:0,month:0,total:0};
+    // Инициализируем всегда — чтобы захватить place/lvl2 для сортировки
+    if(!byWork[work]) byWork[work]={week:0,month:0,total:0,place:r.place||'',lvl2:r.lvl2||'',corpora:{}};
     if(!isDone) return;
     totalDone++;
     byWork[work].total++;
+    // Разбивка по корпусам
+    var corp=r.corpus||'?';
+    if(!byWork[work].corpora[corp]) byWork[work].corpora[corp]={week:0,month:0,total:0};
+    byWork[work].corpora[corp].total++;
     var dateEnd=mod&&mod.dateEnd!==undefined?mod.dateEnd:(r.dateEnd||'');
     var dMs=dateEnd?parseDateMs(dateEnd):0;
     if(dMs&&dMs<=now){
       var age=now-dMs;
-      if(age<=weekMs){byWork[work].week++;totalWeek++;}
-      if(age<=monthMs){byWork[work].month++;totalMonth++;}
+      if(age<=weekMs){byWork[work].week++;byWork[work].corpora[corp].week++;}
+      if(age<=monthMs){byWork[work].month++;byWork[work].corpora[corp].month++;}
     }
   });
 
   document.getElementById('an-sub').textContent='Отфильтровано: '+totalAll+' поз. · выполнено: '+totalDone;
-  document.getElementById('an-sum').innerHTML=
-    '<div class="an-sum-card"><div class="an-sum-val">'+totalWeek+'</div><div class="an-sum-lbl">За 7 дней</div></div>'+
-    '<div class="an-sum-card"><div class="an-sum-val">'+totalMonth+'</div><div class="an-sum-lbl">За 30 дней</div></div>'+
-    '<div class="an-sum-card"><div class="an-sum-val">'+totalDone+'</div><div class="an-sum-lbl">Итого выполнено</div></div>'+
-    '<div class="an-sum-card"><div class="an-sum-val">'+totalAll+'</div><div class="an-sum-lbl">Всего позиций</div></div>';
 
-  var works=Object.keys(byWork).sort((a,b)=>byWork[b].total-byWork[a].total);
+  // Только работы с хотя бы 1 выполненной; сортировка: place > lvl2 > work
+  var works=Object.keys(byWork).filter(w=>byWork[w].total>0).sort((a,b)=>{
+    var da=byWork[a],db=byWork[b];
+    var pc=da.place<db.place?-1:da.place>db.place?1:0; if(pc) return pc;
+    var lc=da.lvl2<db.lvl2?-1:da.lvl2>db.lvl2?1:0;    if(lc) return lc;
+    return a<b?-1:a>b?1:0;
+  });
+
   if(!works.length){
     document.getElementById('an-body').innerHTML='<div class="an-empty">Нет выполненных позиций по текущему фильтру</div>';
     return;
   }
+
+  var totalWeek=0,totalMonth=0;
+  works.forEach(w=>{totalWeek+=byWork[w].week;totalMonth+=byWork[w].month;});
+
   var h='<table class="an-table">';
   h+='<thead><tr><th>Работа</th><th class="r">7 дней</th><th class="r">30 дней</th><th class="r">Итого</th></tr></thead><tbody>';
+  var curPlace='__NONE__';
+  var idx=0;
   works.forEach(w=>{
     var d=byWork[w];
-    h+='<tr><td style="max-width:240px;word-break:break-word;line-height:1.35;">'+e(w)+'</td>';
+    // Заголовок группы при смене place
+    if(d.place!==curPlace){
+      curPlace=d.place;
+      h+='<tr class="an-grp-hdr"><td colspan="4">'+e(curPlace||'Прочее')+'</td></tr>';
+    }
+    // Строка работы
+    h+='<tr class="an-work-row" onclick="toggleAnDetail('+idx+')">';
+    h+='<td style="max-width:220px;word-break:break-word;line-height:1.35;padding-left:14px;">▸ '+e(w)+'</td>';
     h+='<td class="r"><span class="an-num'+(d.week===0?' zero':'')+'">'+d.week+'</span></td>';
     h+='<td class="r"><span class="an-num'+(d.month===0?' zero':'')+'">'+d.month+'</span></td>';
-    h+='<td class="r"><span class="an-num'+(d.total===0?' zero':'')+'">'+d.total+'</span></td></tr>';
+    h+='<td class="r"><span class="an-num">'+d.total+'</span></td></tr>';
+    // Детализация по корпусам (скрыта)
+    var corps=Object.keys(d.corpora).sort();
+    var dt='<div class="an-detail-wrap"><table class="an-corp-table">';
+    dt+='<thead><tr><th>Корпус</th><th class="r">7 дней</th><th class="r">30 дней</th><th class="r">Итого</th></tr></thead><tbody>';
+    corps.forEach(c=>{
+      var cd=d.corpora[c];
+      dt+='<tr><td>'+e(c)+'</td>';
+      dt+='<td class="r">'+(cd.week||0)+'</td>';
+      dt+='<td class="r">'+(cd.month||0)+'</td>';
+      dt+='<td class="r">'+cd.total+'</td></tr>';
+    });
+    if(corps.length>1){
+      dt+='</tbody><tfoot><tr class="an-corp-foot"><td>Итого</td>';
+      dt+='<td class="r">'+d.week+'</td><td class="r">'+d.month+'</td><td class="r">'+d.total+'</td>';
+      dt+='</tr></tfoot>';
+    } else { dt+='</tbody>'; }
+    dt+='</table></div>';
+    h+='<tr id="an-d-'+idx+'" class="an-detail" style="display:none"><td colspan="4">'+dt+'</td></tr>';
+    idx++;
   });
   h+='</tbody><tfoot><tr class="an-foot"><td style="font-weight:600;">Итого</td>';
   h+='<td class="r">'+totalWeek+'</td><td class="r">'+totalMonth+'</td><td class="r">'+totalDone+'</td></tr></tfoot></table>';
   document.getElementById('an-body').innerHTML=h;
+}
+function toggleAnDetail(idx){
+  var row=document.getElementById('an-d-'+idx);
+  if(row) row.style.display=row.style.display==='none'?'':'none';
 }
 </script>
 
@@ -2087,7 +2140,6 @@ function renderAnalytics(){
     </div>
     <button class="btn" onclick="closeAnalytics()" style="padding:3px 9px;font-size:12px;flex-shrink:0;">✕</button>
   </div>
-  <div class="an-sum" id="an-sum"></div>
   <div class="an-note">Учитываются только статусы «СМР окончены» и «Передано». За неделю/месяц — по дате окончания.</div>
   <div class="an-body" id="an-body"></div>
 </div>
