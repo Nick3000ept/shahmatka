@@ -158,10 +158,15 @@ function doPost(e) {
   }
 }
 
-var _workDict = null;
-
 function getWorkDict() {
-  if (_workDict) return _workDict;
+  // CacheService: справочник работ кешируется на 2 часа (~20-36 КБ, хорошо укладывается в лимит 100 КБ/ключ)
+  // clearCache() сбрасывает ключ sb3_work_dict при любом сохранении данных
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('sb3_work_dict');
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Факт_работы');
   if (!sheet) return {};
@@ -182,7 +187,8 @@ function getWorkDict() {
     if (existing && (existing.place || existing.lvl1 || existing.lvl2) && !place && !lvl1 && !lvl2) return;
     dict[name] = {place: place, lvl1: lvl1, lvl2: lvl2, kp: kp, factNum: factNum};
   });
-  _workDict = dict;
+
+  try { cache.put('sb3_work_dict', JSON.stringify(dict), 7200); } catch(e) {}
   return dict;
 }
 
@@ -345,6 +351,7 @@ function clearCache() {
   try {
     var cache = CacheService.getScriptCache();
     cache.remove('sb3_rows_all');
+    cache.remove('sb3_work_dict');
     ['К1','К2','К3','К4','К5','К6','К7','К8','К9','К10','К11','К12'].forEach(function(c) {
       cache.remove('sb3_rows_' + c);
     });
