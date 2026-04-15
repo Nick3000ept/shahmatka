@@ -2119,7 +2119,7 @@ function renderAnalytics(){
 
   document.getElementById('an-sub').textContent='';
 
-  var works=Object.keys(byWork).filter(w=>byWork[w].total>0).sort((a,b)=>{
+  var works=Object.keys(byWork).sort((a,b)=>{
     var da=byWork[a],db=byWork[b];
     var pc=da.place<db.place?-1:da.place>db.place?1:0; if(pc) return pc;
     var lc=da.lvl2<db.lvl2?-1:da.lvl2>db.lvl2?1:0;    if(lc) return lc;
@@ -2127,7 +2127,7 @@ function renderAnalytics(){
   });
 
   if(!works.length){
-    document.getElementById('an-body').innerHTML='<div class="an-empty">Нет выполненных позиций по текущему фильтру</div>';
+    document.getElementById('an-body').innerHTML='<div class="an-empty">Нет данных по текущему фильтру</div>';
     return;
   }
 
