@@ -160,10 +160,7 @@ thead{position:sticky;top:0;z-index:50;}
 th.corner{position:sticky;left:0;top:0;z-index:60;background:var(--bg2);width:var(--lw);min-width:var(--lw);border-right:2px solid var(--brd2);border-bottom:2px solid var(--brd2);text-align:center;}
 .corner-lbl{font-family:var(--mono);font-size:8px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;padding:3px;}
 
-/* Клик по заголовку строки — выбор всей строки */
-td.rh{position:sticky;left:0;z-index:20;background:var(--bg2);width:var(--lw);min-width:var(--lw);height:30px;border-right:2px solid var(--brd2);border-bottom:1px solid var(--brd);text-align:center;vertical-align:top;padding:0;cursor:pointer;transition:background .1s;}
-td.rh:hover{background:var(--bg4);}
-td.rh.row-sel{background:#dbeafe;}
+td.rh{position:sticky;left:0;z-index:20;background:var(--bg2);width:var(--lw);min-width:var(--lw);height:30px;border-right:2px solid var(--brd2);border-bottom:1px solid var(--brd);text-align:center;vertical-align:top;padding:0;cursor:default;}
 .rh-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;height:30px;overflow:hidden;}
 .rh-num{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);line-height:1;}
 .rh-lbl{font-size:7px;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;}
@@ -472,6 +469,10 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     Показать объемы
   </label>
   <label class="chk-lbl">
+    <input type="checkbox" id="foverdue" onchange="FOVERDUE=this.checked;render();">
+    Просрочено
+  </label>
+  <label class="chk-lbl">
     <input type="checkbox" id="fplan7" onchange="FPLAN7=this.checked;render();">
     План на 7 дней
   </label>
@@ -666,7 +667,7 @@ var _contractorTouched = false; // был ли подрядчик изменён
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = []; // порядок строк
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false;
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false;
 var WORKS=[];
 
 function renderWorkDrop(query){
@@ -1166,11 +1167,12 @@ function render(){
       if(!hasDateBefore) return false;
     }
     // Фильтры плана по текущей дате окончания
-    if(FPLAN7||FPLAN30){
+    if(FOVERDUE||FPLAN7||FPLAN30){
       var dCur=r.currentDate?parseDateMs(fmtDate(r.currentDate)):0;
       if(!dCur) return false;
-      var today=Date.now();
-      var ok=(FPLAN7&&dCur<=today+7*24*3600*1000)||(FPLAN30&&dCur<=today+30*24*3600*1000);
+      var _now=Date.now();
+      var _todayStart=new Date();_todayStart.setHours(0,0,0,0);var _todayMs=_todayStart.getTime();
+      var ok=(FOVERDUE&&dCur<_todayMs)||(FPLAN7&&dCur<=_now+7*24*3600*1000)||(FPLAN30&&dCur<=_now+30*24*3600*1000);
       if(!ok) return false;
     }
     return true;
@@ -1322,7 +1324,7 @@ function render(){
     var rowSel=isRowSelected(fl);
     var isFloorSep=(fl>0 && fl%10===0);
     h+='<tr>';
-    h+='<td class="rh'+(rowSel?' row-sel':'')+(isFloorSep?' floor-sep':'')+'" data-floor="'+fl+'" onclick="toggleRow('+fl+',event)"><div class="rh-inner"><div class="rh-num">'+fl+'</div><div class="rh-lbl">эт.</div></div></td>';
+    h+='<td class="rh'+(isFloorSep?' floor-sep':'')+'" data-floor="'+fl+'"><div class="rh-inner"><div class="rh-num">'+fl+'</div><div class="rh-lbl">эт.</div></div></td>';
     COL_KEYS.forEach((c,i)=>{
       var isNewC=i===0||COL_KEYS[i-1].corpus!==c.corpus;
       var isNewP=!isNewC&&(i===0||COL_KEYS[i-1].place!==c.place);
