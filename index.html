@@ -1172,7 +1172,10 @@ function render(){
       if(!dCur) return false;
       var _now=Date.now();
       var _todayStart=new Date();_todayStart.setHours(0,0,0,0);var _todayMs=_todayStart.getTime();
-      var ok=(FOVERDUE&&dCur<_todayMs)||(FPLAN7&&dCur<=_now+7*24*3600*1000)||(FPLAN30&&dCur<=_now+30*24*3600*1000);
+      var _mod=MOD[r.rowId];
+      var _s=_mod&&_mod.status!==undefined?_mod.status:(S2CSS[r.status||'']||'s-empty');
+      var _done=_s==='s-done'||_s==='s-accepted';
+      var ok=(FOVERDUE&&dCur<_todayMs&&!_done)||(FPLAN7&&dCur<=_now+7*24*3600*1000)||(FPLAN30&&dCur<=_now+30*24*3600*1000);
       if(!ok) return false;
     }
     return true;
