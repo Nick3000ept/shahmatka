@@ -104,6 +104,24 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .pwd-err{font-size:11px;color:var(--red);min-height:14px;}
 .pwd-btns{display:flex;gap:8px;justify-content:flex-end;}
 
+/* ── CHECKLIST BADGE & POPUP ── */
+.cl-badge{position:absolute;top:2px;right:2px;background:var(--acc);color:#fff;border-radius:8px;font-size:9px;font-weight:700;padding:0 4px;line-height:14px;z-index:2;font-family:var(--mono);pointer-events:none;}
+.cl-pop{display:none;position:fixed;z-index:501;background:#fff;border:1px solid var(--brd2);border-radius:10px;width:380px;max-width:96vw;box-shadow:0 8px 32px rgba(0,0,0,.14);animation:popIn .15s ease;max-height:80vh;overflow:hidden;flex-direction:column;}
+.cl-pop.on{display:flex;}
+.cl-pop-head{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 14px 8px;border-bottom:1px solid var(--brd);flex-shrink:0;gap:8px;}
+.cl-pop-title{font-size:12px;font-weight:600;color:var(--ink);}
+.cl-pop-sub{font-size:10px;color:var(--ink3);margin-top:2px;line-height:1.4;}
+.cl-pop-body{overflow-y:auto;flex:1;}
+.cl-pop-body::-webkit-scrollbar{width:4px;}
+.cl-item{display:flex;flex-direction:column;padding:9px 14px;border-bottom:1px solid var(--brd);cursor:pointer;transition:background .1s;text-decoration:none;}
+.cl-item:hover{background:var(--bg3);}
+.cl-item:last-child{border-bottom:none;}
+.cl-item-top{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--acc);}
+.cl-item-act{font-family:var(--mono);}
+.cl-item-work{font-size:10px;color:var(--ink2);margin-top:3px;line-height:1.3;}
+.cl-item-status{font-size:10px;color:var(--ink3);margin-top:2px;}
+.cl-remarks{background:var(--red-bg);color:var(--red);border-radius:4px;padding:0 4px;font-size:9px;font-weight:600;white-space:nowrap;}
+
 /* ── ANALYTICS PANEL ── */
 .an-panel{display:none;position:fixed;top:0;right:0;width:480px;max-width:96vw;height:100vh;background:var(--bg2);border-left:1px solid var(--brd);z-index:490;flex-direction:column;box-shadow:-6px 0 28px rgba(0,0,0,.1);}
 .an-panel.on{display:flex;}
@@ -469,6 +487,10 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     Показать объемы
   </label>
   <label class="chk-lbl">
+    <input type="checkbox" id="fchk" onchange="SHOW_CL=this.checked;if(SHOW_CL)loadCheckLists();else render();">
+    Показать ЧЛ
+  </label>
+  <label class="chk-lbl">
     <input type="checkbox" id="foverdue" onchange="FOVERDUE=this.checked;render();">
     Просрочено
   </label>
@@ -667,7 +689,8 @@ var _contractorTouched = false; // был ли подрядчик изменён
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = []; // порядок строк
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false;
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, SHOW_CL=false;
+var CHECK_LISTS=[], CL_MAP={};
 var WORKS=[];
 
 function renderWorkDrop(query){
@@ -763,7 +786,7 @@ window.onload=function(){
   setTimeout(loadContractors, 1500);
   document.addEventListener('keydown',function(e){
     if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveAll();}
-    if(e.key==='Escape'){clearSel(true);closePanel();}
+    if(e.key==='Escape'){clearSel(true);closePanel();closeClPanel();}
   });
   // Клик вне попапа — закрываем
   document.addEventListener('mousedown',function(ev){
@@ -1425,12 +1448,15 @@ function render(){
           +(rightFact?'<div style="position:absolute;top:1px;right:2px;font-size:8px;line-height:1;opacity:.75;">📌</div>':'');
       }
 
+      var _clItems=[];
+      if(SHOW_CL&&row.idFact){var _clk=row.corpus+'|||'+String(row.floor)+'|||'+row.idFact;_clItems=CL_MAP[_clk]||[];}
       h+='<td class="cell '+s+(isNewC?' gs':isNewP?' gp':'')+(isMod?' modified':'')+(isSel?' sel':'')+(isFloorSep?' floor-sep':'')+(isNotMine?' not-mine':'')+'" data-rid="'+e(rowId)+'" onclick="cellClick(event,\''+e(rowId)+'\')">'
         +'<div class="ci">'
         +'<div class="c-row">'+cellContent+'</div>'
         +(!SHOW_SP?diffHtml:'')
         +'</div>'
         +(pctNum>0?'<div class="c-bar"><div class="c-bar-fill" style="width:'+pctNum+'%"></div></div>':'')
+        +(_clItems.length>0?'<div class="cl-badge">'+_clItems.length+'</div>':'')
         +'</td>';
     });
     h+='</tr>';
@@ -1525,6 +1551,14 @@ function cellClick(ev, rowId){
     updateCellSel();
     updateMsBar();
     return;
+  }
+  if(SHOW_CL){
+    var _clRow=ROWS.find(r=>r.rowId===rowId);
+    if(_clRow&&_clRow.idFact){
+      var _clKey=_clRow.corpus+'|||'+String(_clRow.floor)+'|||'+_clRow.idFact;
+      var _clItems=CL_MAP[_clKey]||[];
+      if(_clItems.length>0){openClPanel(_clItems, ev.currentTarget||ev.target, _clRow); return;}
+    }
   }
   clearSel();
   SEL.add(rowId);
@@ -2186,7 +2220,85 @@ function toggleAnDetail(idx){
   var arrow=document.querySelector('.an-wr-'+idx+' .an-arrow');
   if(arrow) arrow.textContent=open?'▾':'▸';
 }
+
+// ─── ЧЕК-ЛИСТЫ ────────────────────────────────────────────────────
+function loadCheckLists(){
+  if(CHECK_LISTS.length>0){buildClMap();render();return;}
+  setSt('spin','Загрузка ЧЛ…');
+  fetch(BASE+'?action=getCheckLists')
+    .then(r=>r.json())
+    .then(data=>{
+      CHECK_LISTS=data.items||[];
+      buildClMap();
+      setSt('ok','');
+      render();
+    })
+    .catch(()=>{setSt('err','');toast('Ошибка загрузки чек-листов','err');});
+}
+function buildClMap(){
+  CL_MAP={};
+  CHECK_LISTS.forEach(function(item){
+    if(!item.idFact) return;
+    var key=item.corpus+'|||'+item.floor+'|||'+item.idFact;
+    if(!CL_MAP[key]) CL_MAP[key]=[];
+    CL_MAP[key].push(item);
+  });
+}
+function openClPanel(clItems, anchorEl, row){
+  var pop=document.getElementById('cl-pop');
+  document.getElementById('cl-pop-title').textContent='Чек-листы ('+clItems.length+')';
+  document.getElementById('cl-pop-sub').textContent=(row?(row.work||''):'')+(row?' · '+(row.corpus||'')+' эт.'+row.floor:'');
+  var h='';
+  clItems.forEach(function(item){
+    var link=item.linkS3||item.linkDrive||'';
+    var st=item.status||'';
+    var stCol=st.toLowerCase().indexOf('замеч')>=0?'color:var(--red)':st.toLowerCase().indexOf('подписа')>=0||st.toLowerCase().indexOf('передан')>=0?'color:var(--green)':'';
+    var hasRemarks=item.remarksOpen&&item.remarksOpen!=='0'&&item.remarksOpen!=='';
+    h+='<div class="cl-item" onclick="clOpenLink(\''+e(link)+'\')">';
+    h+='<div class="cl-item-top">';
+    h+='<span class="cl-item-act">'+e(item.actNum||'—')+'</span>';
+    h+='<span style="color:var(--ink3);font-weight:400;font-size:10px;">|</span>';
+    h+='<span>'+e(item.date||'—')+'</span>';
+    if(hasRemarks) h+='<span class="cl-remarks">⚠ '+e(item.remarksOpen)+' откр.</span>';
+    if(link) h+='<span style="color:var(--ink3);font-size:10px;margin-left:auto;">↗</span>';
+    h+='</div>';
+    h+='<div class="cl-item-work">'+e(item.work||'—')+'</div>';
+    if(st) h+='<div class="cl-item-status" style="'+stCol+'">'+e(st)+'</div>';
+    h+='</div>';
+  });
+  document.getElementById('cl-pop-body').innerHTML=h||'<div style="padding:12px 14px;font-size:11px;color:var(--ink3)">Нет чек-листов</div>';
+  pop.classList.add('on');
+  pop.style.display='flex';
+  var pw=pop.offsetWidth||380, ph=pop.offsetHeight||300;
+  pop.style.display='';
+  var vw=window.innerWidth, vh=window.innerHeight, margin=8, x=0, y=0;
+  if(anchorEl){
+    var r=anchorEl.getBoundingClientRect();
+    if(r.right+pw+margin<=vw) x=r.right+margin;
+    else if(r.left-pw-margin>=0) x=r.left-pw-margin;
+    else x=Math.max(margin,Math.min(r.left,vw-pw-margin));
+    y=r.top;
+    if(y+ph>vh-margin) y=vh-ph-margin;
+    if(y<margin) y=margin;
+  } else {x=Math.max(margin,(vw-pw)/2);y=Math.max(margin,(vh-ph)/2);}
+  pop.style.left=x+'px';
+  pop.style.top=y+'px';
+}
+function closeClPanel(){document.getElementById('cl-pop').classList.remove('on');}
+function clOpenLink(url){if(url) window.open(url,'_blank');}
 </script>
+
+<!-- CHECKLIST POPUP -->
+<div class="cl-pop" id="cl-pop">
+  <div class="cl-pop-head">
+    <div>
+      <div class="cl-pop-title" id="cl-pop-title">Чек-листы</div>
+      <div class="cl-pop-sub" id="cl-pop-sub"></div>
+    </div>
+    <button class="po-close" onclick="closeClPanel()">✕</button>
+  </div>
+  <div class="cl-pop-body" id="cl-pop-body"></div>
+</div>
 
 <!-- ANALYTICS PANEL -->
 <div id="analytics-panel" class="an-panel">

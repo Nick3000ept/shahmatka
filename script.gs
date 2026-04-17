@@ -51,6 +51,7 @@ function doGet(e) {
     }
 
     if (action === 'clearCache') { clearCache(); return jsonOut({ok: true}); }
+    if (action === 'getCheckLists') return jsonOut(getCheckLists());
 
 
     if (action === 'checkPassword') {
@@ -199,7 +200,7 @@ function getRows(filterCorpus) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return {rows: []};
   var dict = getWorkDict();
-  var values = sheet.getRange(2, 1, lastRow - 1, 18).getValues();
+  var values = sheet.getRange(2, 1, lastRow - 1, 20).getValues();
   var rows = [];
   for (var i = 0; i < values.length; i++) {
     var row = values[i];
@@ -231,7 +232,8 @@ function getRows(filterCorpus) {
       baseDate   : formatDateOut(row[14]),
       currentDate: formatDateOut(row[15]),
       volume     : String(row[16]).trim(),
-      unit       : String(row[17]).trim()
+      unit       : String(row[17]).trim(),
+      idFact     : String(row[19]).trim()
     });
   }
   rows.sort(function(a, b) {
@@ -347,11 +349,56 @@ function parseDate(s) {
 
 function pad(n) { return n < 10 ? '0' + n : String(n); }
 
+function getCheckLists() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('sb3_checklists');
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Чек_листы');
+  if (!sheet) return {items: []};
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {items: []};
+  // A:AB = 28 столбцов
+  var values = sheet.getRange(2, 1, lastRow - 1, 28).getValues();
+  var items = [];
+  values.forEach(function(row) {
+    var idFact = String(row[27]).trim(); // AB
+    if (!idFact) return;
+    var corpus = String(row[2]).trim();  // C
+    var floor  = String(row[3]).trim();  // D
+    if (!corpus || !floor) return;
+    items.push({
+      corpus       : corpus,
+      floor        : floor,
+      razdel       : String(row[4]).trim(),   // E
+      podrazdel    : String(row[5]).trim(),   // F
+      work         : String(row[6]).trim(),   // G
+      actNum       : String(row[7]).trim(),   // H
+      date         : formatDateOut(row[8]),   // I
+      status       : String(row[9]).trim(),   // J
+      contractor   : String(row[10]).trim(),  // K
+      remarksTotal : String(row[12]).trim(),  // M
+      remarksOpen  : String(row[13]).trim(),  // N
+      linkS3       : String(row[14]).trim(),  // O
+      linkDrive    : String(row[15]).trim(),  // P
+      comment      : String(row[16]).trim(),  // Q
+      idCl         : String(row[26]).trim(),  // AA
+      idFact       : idFact
+    });
+  });
+  var result = {items: items};
+  try { cache.put('sb3_checklists', JSON.stringify(result), 7200); } catch(e) {}
+  return result;
+}
+
 function clearCache() {
   try {
     var cache = CacheService.getScriptCache();
     cache.remove('sb3_rows_all');
     cache.remove('sb3_work_dict');
+    cache.remove('sb3_checklists');
     ['К1','К2','К3','К4','К5','К6','К7','К8','К9','К10','К11','К12'].forEach(function(c) {
       cache.remove('sb3_rows_' + c);
     });
