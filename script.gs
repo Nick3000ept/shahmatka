@@ -384,6 +384,7 @@ function getCheckLists() {
       linkS3       : String(row[14]).trim(),  // O
       linkDrive    : String(row[15]).trim(),  // P
       comment      : String(row[16]).trim(),  // Q
+      remarksText  : String(row[18]).trim(),  // S - текст замечаний
       idCl         : String(row[26]).trim(),  // AA
       idFact       : idFact
     });

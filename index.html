@@ -121,6 +121,7 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .cl-item-work{font-size:10px;color:var(--ink2);margin-top:3px;line-height:1.3;}
 .cl-item-status{font-size:10px;color:var(--ink3);margin-top:2px;}
 .cl-remarks{background:var(--red-bg);color:var(--red);border-radius:4px;padding:0 4px;font-size:9px;font-weight:600;white-space:nowrap;}
+.cl-item-remarks{font-size:10px;color:var(--ink2);margin-top:4px;line-height:1.4;background:var(--red-bg);border-radius:4px;padding:3px 7px;white-space:pre-wrap;}
 
 /* ── ANALYTICS PANEL ── */
 .an-panel{display:none;position:fixed;top:0;right:0;width:480px;max-width:96vw;height:100vh;background:var(--bg2);border-left:1px solid var(--brd);z-index:490;flex-direction:column;box-shadow:-6px 0 28px rgba(0,0,0,.1);}
@@ -1427,8 +1428,19 @@ function render(){
         }
       }
 
+      var _clItems=[];
+      if(SHOW_CL&&row.idFact){var _clk=row.corpus+'|||'+String(row.floor)+'|||'+row.idFact;_clItems=CL_MAP[_clk]||[];}
+      var _clTot=_clItems.length,_clRem=_clItems.filter(function(i){return i.remarksOpen&&i.remarksOpen!=='0'&&i.remarksOpen!=='';}).length,_clAcc=_clItems.filter(function(i){return (i.status||'').toLowerCase().indexOf('северин')>=0;}).length;
       var cellContent;
-      if(SHOW_VOL){
+      if(SHOW_CL){
+        cellContent=!row.idFact
+          ?'<div style="font-family:var(--mono);font-size:9px;color:var(--ink3);text-align:center;width:100%;">—</div>'
+          :'<div style="font-family:var(--mono);font-size:9px;font-weight:700;text-align:center;width:100%;line-height:1.6;">'
+            +'<span title="Всего ЧЛ">'+_clTot+'</span>'
+            +' / <span style="color:'+(_clRem>0?'var(--red)':'var(--ink3)')+'" title="Есть замечания">'+_clRem+'</span>'
+            +' / <span style="color:'+(_clAcc>0?'var(--green)':'var(--ink3)')+'" title="Принято Северин">'+_clAcc+'</span>'
+            +'</div>';
+      } else if(SHOW_VOL){
         var vol=(row.volume||'—')+(row.unit?' '+row.unit:'');
         cellContent='<div class="c-date" style="font-size:10px;text-align:center;width:100%;">'+e(vol)+'</div>';
       } else if(SHOW_SP){
@@ -1448,15 +1460,12 @@ function render(){
           +(rightFact?'<div style="position:absolute;top:1px;right:2px;font-size:8px;line-height:1;opacity:.75;">📌</div>':'');
       }
 
-      var _clItems=[];
-      if(SHOW_CL&&row.idFact){var _clk=row.corpus+'|||'+String(row.floor)+'|||'+row.idFact;_clItems=CL_MAP[_clk]||[];}
       h+='<td class="cell '+s+(isNewC?' gs':isNewP?' gp':'')+(isMod?' modified':'')+(isSel?' sel':'')+(isFloorSep?' floor-sep':'')+(isNotMine?' not-mine':'')+'" data-rid="'+e(rowId)+'" onclick="cellClick(event,\''+e(rowId)+'\')">'
         +'<div class="ci">'
         +'<div class="c-row">'+cellContent+'</div>'
         +(!SHOW_SP?diffHtml:'')
         +'</div>'
-        +(pctNum>0?'<div class="c-bar"><div class="c-bar-fill" style="width:'+pctNum+'%"></div></div>':'')
-        +(_clItems.length>0?'<div class="cl-badge">'+_clItems.length+'</div>':'')
+        +(pctNum>0&&!SHOW_CL?'<div class="c-bar"><div class="c-bar-fill" style="width:'+pctNum+'%"></div></div>':'')
         +'</td>';
     });
     h+='</tr>';
@@ -2264,6 +2273,7 @@ function openClPanel(clItems, anchorEl, row){
     h+='</div>';
     h+='<div class="cl-item-work">'+e(item.work||'—')+'</div>';
     if(st) h+='<div class="cl-item-status" style="'+stCol+'">'+e(st)+'</div>';
+    if(item.remarksText) h+='<div class="cl-item-remarks">'+e(item.remarksText)+'</div>';
     h+='</div>';
   });
   document.getElementById('cl-pop-body').innerHTML=h||'<div style="padding:12px 14px;font-size:11px;color:var(--ink3)">Нет чек-листов</div>';
