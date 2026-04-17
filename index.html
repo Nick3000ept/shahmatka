@@ -1566,8 +1566,9 @@ function cellClick(ev, rowId){
     if(_clRow&&_clRow.idFact){
       var _clKey=_clRow.corpus+'|||'+String(_clRow.floor)+'|||'+_clRow.idFact;
       var _clItems=CL_MAP[_clKey]||[];
-      if(_clItems.length>0){openClPanel(_clItems, ev.currentTarget||ev.target, _clRow); return;}
+      if(_clItems.length>0) openClPanel(_clItems, ev.currentTarget||ev.target, _clRow);
     }
+    return;
   }
   clearSel();
   SEL.add(rowId);
