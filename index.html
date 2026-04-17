@@ -2269,7 +2269,6 @@ function openClPanel(clItems, anchorEl, row){
     h+='<span class="cl-item-act">'+e(item.actNum||'—')+'</span>';
     h+='<span style="color:var(--ink3);font-weight:400;font-size:10px;">|</span>';
     h+='<span>'+e(item.date||'—')+'</span>';
-    if(hasRemarks) h+='<span class="cl-remarks">⚠ '+e(item.remarksOpen)+' откр.</span>';
     if(link) h+='<span style="color:var(--ink3);font-size:10px;margin-left:auto;">↗</span>';
     h+='</div>';
     h+='<div class="cl-item-work">'+e(item.work||'—')+'</div>';
