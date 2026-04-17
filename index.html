@@ -1433,8 +1433,8 @@ function render(){
       var _clTot=_clItems.length,_clRem=_clItems.filter(function(i){return i.remarksOpen&&i.remarksOpen!=='0'&&i.remarksOpen!=='';}).length,_clAcc=_clItems.filter(function(i){return (i.status||'').toLowerCase().indexOf('северин')>=0;}).length;
       var cellContent;
       if(SHOW_CL){
-        cellContent=!row.idFact
-          ?'<div style="font-family:var(--mono);font-size:9px;color:var(--ink3);text-align:center;width:100%;">—</div>'
+        cellContent=(!row.idFact||_clTot===0)
+          ?''
           :'<div style="font-family:var(--mono);font-size:9px;font-weight:700;text-align:center;width:100%;line-height:1.6;">'
             +'<span title="Всего ЧЛ">'+_clTot+'</span>'
             +' / <span style="color:'+(_clRem>0?'var(--red)':'var(--ink3)')+'" title="Есть замечания">'+_clRem+'</span>'
@@ -1463,7 +1463,7 @@ function render(){
       h+='<td class="cell '+s+(isNewC?' gs':isNewP?' gp':'')+(isMod?' modified':'')+(isSel?' sel':'')+(isFloorSep?' floor-sep':'')+(isNotMine?' not-mine':'')+'" data-rid="'+e(rowId)+'" onclick="cellClick(event,\''+e(rowId)+'\')">'
         +'<div class="ci">'
         +'<div class="c-row">'+cellContent+'</div>'
-        +(!SHOW_SP?diffHtml:'')
+        +(!SHOW_SP&&!SHOW_CL?diffHtml:'')
         +'</div>'
         +(pctNum>0&&!SHOW_CL?'<div class="c-bar"><div class="c-bar-fill" style="width:'+pctNum+'%"></div></div>':'')
         +'</td>';
