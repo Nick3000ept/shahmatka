@@ -1430,7 +1430,7 @@ function render(){
 
       var _clItems=[];
       if(SHOW_CL&&row.idFact){var _clk=row.corpus+'|||'+String(row.floor)+'|||'+row.idFact;_clItems=dedupeClItems(CL_MAP[_clk]||[]);}
-      var _clTot=_clItems.length,_clRem=_clItems.filter(function(i){return i.remarksOpen&&i.remarksOpen!=='0'&&i.remarksOpen!=='';}).length,_clAcc=_clItems.filter(function(i){return (i.status||'').toLowerCase().indexOf('северин')>=0;}).length;
+      var _clTot=_clItems.length,_clRem=_clItems.filter(function(i){return (i.status||'').toLowerCase().indexOf('замеч')>=0;}).length,_clAcc=_clItems.filter(function(i){return (i.status||'').toLowerCase().indexOf('принят')>=0;}).length;
       var cellContent;
       if(SHOW_CL){
         cellContent=(!row.idFact||_clTot===0)
