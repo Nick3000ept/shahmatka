@@ -1429,7 +1429,7 @@ function render(){
       }
 
       var _clItems=[];
-      if(SHOW_CL&&row.idFact){var _clk=row.corpus+'|||'+String(row.floor)+'|||'+row.idFact;_clItems=CL_MAP[_clk]||[];}
+      if(SHOW_CL&&row.idFact){var _clk=row.corpus+'|||'+String(row.floor)+'|||'+row.idFact;_clItems=dedupeClItems(CL_MAP[_clk]||[]);}
       var _clTot=_clItems.length,_clRem=_clItems.filter(function(i){return i.remarksOpen&&i.remarksOpen!=='0'&&i.remarksOpen!=='';}).length,_clAcc=_clItems.filter(function(i){return (i.status||'').toLowerCase().indexOf('северин')>=0;}).length;
       var cellContent;
       if(SHOW_CL){
@@ -1565,7 +1565,7 @@ function cellClick(ev, rowId){
     var _clRow=ROWS.find(r=>r.rowId===rowId);
     if(_clRow&&_clRow.idFact){
       var _clKey=_clRow.corpus+'|||'+String(_clRow.floor)+'|||'+_clRow.idFact;
-      var _clItems=CL_MAP[_clKey]||[];
+      var _clItems=dedupeClItems(CL_MAP[_clKey]||[]);
       if(_clItems.length>0) openClPanel(_clItems, ev.currentTarget||ev.target, _clRow);
     }
     return;
@@ -2253,6 +2253,16 @@ function buildClMap(){
     if(!CL_MAP[key]) CL_MAP[key]=[];
     CL_MAP[key].push(item);
   });
+}
+function dedupeClItems(items){
+  var seen={},out=[];
+  items.forEach(function(i){
+    var k=i.actNum||i.idCl||'';
+    if(k&&seen[k]) return;
+    if(k) seen[k]=true;
+    out.push(i);
+  });
+  return out;
 }
 function openClPanel(clItems, anchorEl, row){
   var pop=document.getElementById('cl-pop');
