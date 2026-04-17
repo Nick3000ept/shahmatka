@@ -2255,12 +2255,25 @@ function buildClMap(){
   });
 }
 function dedupeClItems(items){
-  var seen={},out=[];
+  var groups={},order=[];
   items.forEach(function(i){
     var k=i.actNum||i.idCl||'';
-    if(k&&seen[k]) return;
-    if(k) seen[k]=true;
-    out.push(i);
+    if(!k){return;}
+    if(!groups[k]){groups[k]=[];order.push(k);}
+    groups[k].push(i);
+  });
+  var out=[];
+  order.forEach(function(k){
+    var arr=groups[k];
+    // Берём запись с максимальной датой
+    arr.sort(function(a,b){
+      var da=a.date?parseDateMs(a.date):0;
+      var db=b.date?parseDateMs(b.date):0;
+      return db-da;
+    });
+    var best=Object.assign({},arr[0]);
+    if(arr.length>1) best._updates=arr.length;
+    out.push(best);
   });
   return out;
 }
@@ -2279,6 +2292,7 @@ function openClPanel(clItems, anchorEl, row){
     h+='<span class="cl-item-act">'+e(item.actNum||'—')+'</span>';
     h+='<span style="color:var(--ink3);font-weight:400;font-size:10px;">|</span>';
     h+='<span>'+e(item.date||'—')+'</span>';
+    if(item._updates) h+='<span style="background:var(--bg4);color:var(--ink3);border-radius:4px;padding:0 4px;font-size:9px;font-weight:500;" title="Загружался '+item._updates+' раз">обн.×'+item._updates+'</span>';
     if(link) h+='<span style="color:var(--ink3);font-size:10px;margin-left:auto;">↗</span>';
     h+='</div>';
     h+='<div class="cl-item-work">'+e(item.work||'—')+'</div>';
