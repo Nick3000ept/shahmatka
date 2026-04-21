@@ -2299,14 +2299,15 @@ function buildStaffingHtml(){
   h+='</div><div class="staff-bars-wrap"><div class="staff-bars">';
   weekKeys.forEach(function(wk){
     var d=new Date(wk), lbl=p2(d.getDate())+'.'+p2(d.getMonth()+1);
-    h+='<div class="staff-col"><div class="staff-stack">';
+    var total=0; contractors.forEach(function(c){total+=wkAvg(wk,c);});
+    h+='<div class="staff-col">';
+    h+='<div style="font-size:9px;font-family:var(--mono);font-weight:700;color:var(--ink2);text-align:center;line-height:1;margin-bottom:2px;">'+total+'</div>';
+    h+='<div class="staff-stack">';
     contractors.forEach(function(c){
       var val=wkAvg(wk,c);
       if(!val) return;
       var segH=Math.max(3,Math.round(val/maxVal*BAR_H));
-      h+='<div class="staff-seg" style="height:'+segH+'px;background:'+cmap[c]+'" title="'+e(c)+': '+val+' чел.">';
-      if(segH>=14) h+='<div class="staff-seg-lbl" style="line-height:'+segH+'px;">'+val+'</div>';
-      h+='</div>';
+      h+='<div class="staff-seg" style="height:'+segH+'px;background:'+cmap[c]+'" title="'+e(c)+': '+val+' чел."></div>';
     });
     h+='</div><div class="staff-xlbl">'+lbl+'</div></div>';
   });
