@@ -2276,18 +2276,22 @@ function buildStaffingHtml(){
     var ms=parseDateMs(item.date);
     var wk=getWeekStart(ms);
     if(!weeks[wk]) weeks[wk]={};
-    weeks[wk][item.contractor]=(weeks[wk][item.contractor]||0)+item.count;
+    if(!weeks[wk][item.contractor]) weeks[wk][item.contractor]={sum:0,cnt:0};
+    weeks[wk][item.contractor].sum+=item.count;
+    weeks[wk][item.contractor].cnt++;
     contractorSet[item.contractor]=true;
   });
+  // avg(contractor, week) = sum/cnt
   var weekKeys=Object.keys(weeks).map(Number).sort();
   var contractors=Object.keys(contractorSet).sort();
   var palette=['#2563eb','#16a34a','#ca8a04','#dc2626','#7c3aed','#0891b2','#ea580c','#be185d'];
   var cmap={};contractors.forEach(function(c,i){cmap[c]=palette[i%palette.length];});
+  function wkAvg(wk,c){var d=weeks[wk][c];return d?Math.round(d.sum/d.cnt):0;}
   var maxVal=0;
-  weekKeys.forEach(function(wk){var t=0;contractors.forEach(function(c){t+=weeks[wk][c]||0;});if(t>maxVal)maxVal=t;});
+  weekKeys.forEach(function(wk){var t=0;contractors.forEach(function(c){t+=wkAvg(wk,c);});if(t>maxVal)maxVal=t;});
   var BAR_H=140, p2=function(n){return n<10?'0'+n:String(n);};
   var h='<div class="staff-section">';
-  h+='<div class="staff-title">Численность монтажников — последние 3 месяца</div>';
+  h+='<div class="staff-title">Среднее количество монтажников на площадке — последние 3 мес.</div>';
   h+='<div class="staff-legend">';
   contractors.forEach(function(c){
     h+='<div class="staff-leg-item"><div style="width:10px;height:10px;border-radius:2px;background:'+cmap[c]+';flex-shrink:0;"></div>'+e(c)+'</div>';
@@ -2297,7 +2301,7 @@ function buildStaffingHtml(){
     var d=new Date(wk), lbl=p2(d.getDate())+'.'+p2(d.getMonth()+1);
     h+='<div class="staff-col"><div class="staff-stack">';
     contractors.forEach(function(c){
-      var val=weeks[wk][c]||0;
+      var val=wkAvg(wk,c);
       if(!val) return;
       var segH=Math.max(3,Math.round(val/maxVal*BAR_H));
       h+='<div class="staff-seg" style="height:'+segH+'px;background:'+cmap[c]+'" title="'+e(c)+': '+val+' чел.">';
