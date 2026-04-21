@@ -131,6 +131,18 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .an-sub{font-size:10px;color:var(--ink3);margin-top:3px;line-height:1.4;}
 .an-body{overflow-y:auto;flex:1;padding:0;}
 .an-body::-webkit-scrollbar{width:4px;}
+.staff-section{padding:14px 16px 0;border-bottom:1px solid var(--brd);}
+.staff-title{font-size:11px;font-weight:600;color:var(--ink);margin-bottom:8px;}
+.staff-legend{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
+.staff-leg-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--ink2);}
+.staff-bars-wrap{overflow-x:auto;padding-bottom:12px;}
+.staff-bars{display:flex;align-items:flex-end;gap:3px;height:160px;min-width:fit-content;}
+.staff-col{display:flex;flex-direction:column;align-items:center;min-width:34px;flex:1;max-width:60px;}
+.staff-stack{display:flex;flex-direction:column-reverse;width:100%;gap:1px;height:140px;justify-content:flex-start;}
+.staff-seg{width:100%;min-height:2px;border-radius:1px;position:relative;transition:opacity .1s;cursor:default;}
+.staff-seg:hover{opacity:.75;}
+.staff-seg-lbl{font-size:8px;font-family:var(--mono);color:#fff;text-align:center;font-weight:700;line-height:1;padding-top:2px;overflow:hidden;}
+.staff-xlbl{font-size:8px;color:var(--ink3);margin-top:4px;font-family:var(--mono);text-align:center;white-space:nowrap;}
 .an-body::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px;}
 .an-note{padding:6px 16px;font-size:9px;color:var(--ink3);border-bottom:1px solid var(--brd);font-style:italic;}
 .an-grp-hdr td{background:var(--bg3)!important;font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;padding:6px 10px;border-bottom:1px solid var(--brd2);border-top:2px solid var(--brd2);}
@@ -691,7 +703,7 @@ var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбц
 var FLOOR_LIST = []; // порядок строк
 
 var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, SHOW_CL=false;
-var CHECK_LISTS=[], CL_MAP={};
+var CHECK_LISTS=[], CL_MAP={}, STAFFING_DATA=[];
 var WORKS=[];
 
 function renderWorkDrop(query){
@@ -2101,7 +2113,10 @@ function toggleAnalytics(){
   ANALYTICS_OPEN=!ANALYTICS_OPEN;
   document.getElementById('analytics-panel').classList.toggle('on',ANALYTICS_OPEN);
   document.getElementById('an-btn').classList.toggle('btn-pri',ANALYTICS_OPEN);
-  if(ANALYTICS_OPEN) renderAnalytics();
+  if(ANALYTICS_OPEN){
+    if(!STAFFING_DATA.length) loadStaffing(function(){renderAnalytics();});
+    renderAnalytics();
+  }
 }
 function closeAnalytics(){
   ANALYTICS_OPEN=false;
@@ -2218,7 +2233,7 @@ function renderAnalytics(){
     idx++;
   });
   h+='</tbody></table>';
-  document.getElementById('an-body').innerHTML=h;
+  document.getElementById('an-body').innerHTML=buildStaffingHtml()+h;
 }
 function toggleAnDetail(idx){
   var open=false;
@@ -2229,6 +2244,70 @@ function toggleAnDetail(idx){
   });
   var arrow=document.querySelector('.an-wr-'+idx+' .an-arrow');
   if(arrow) arrow.textContent=open?'▾':'▸';
+}
+
+// ─── ЧИСЛЕННОСТЬ ──────────────────────────────────────────────────
+function loadStaffing(cb){
+  if(STAFFING_DATA.length>0){if(cb)cb();return;}
+  fetch(BASE+'?action=getStaffing')
+    .then(r=>r.json())
+    .then(data=>{STAFFING_DATA=data.items||[];if(cb)cb();})
+    .catch(()=>{});
+}
+function getWeekStart(ms){
+  var d=new Date(ms);
+  var day=d.getDay();
+  d.setDate(d.getDate()+(day===0?-6:1-day));
+  d.setHours(0,0,0,0);
+  return d.getTime();
+}
+function buildStaffingHtml(){
+  if(!STAFFING_DATA.length) return '';
+  var now=Date.now(), ago=now-91*24*3600*1000;
+  var filtered=STAFFING_DATA.filter(function(item){
+    var ms=parseDateMs(item.date);
+    if(!ms||ms<ago) return false;
+    if(FO&&item.contractor!==FO) return false;
+    return true;
+  });
+  if(!filtered.length) return '';
+  var weeks={},contractorSet={};
+  filtered.forEach(function(item){
+    var ms=parseDateMs(item.date);
+    var wk=getWeekStart(ms);
+    if(!weeks[wk]) weeks[wk]={};
+    weeks[wk][item.contractor]=(weeks[wk][item.contractor]||0)+item.count;
+    contractorSet[item.contractor]=true;
+  });
+  var weekKeys=Object.keys(weeks).map(Number).sort();
+  var contractors=Object.keys(contractorSet).sort();
+  var palette=['#2563eb','#16a34a','#ca8a04','#dc2626','#7c3aed','#0891b2','#ea580c','#be185d'];
+  var cmap={};contractors.forEach(function(c,i){cmap[c]=palette[i%palette.length];});
+  var maxVal=0;
+  weekKeys.forEach(function(wk){var t=0;contractors.forEach(function(c){t+=weeks[wk][c]||0;});if(t>maxVal)maxVal=t;});
+  var BAR_H=140, p2=function(n){return n<10?'0'+n:String(n);};
+  var h='<div class="staff-section">';
+  h+='<div class="staff-title">Численность монтажников — последние 3 месяца</div>';
+  h+='<div class="staff-legend">';
+  contractors.forEach(function(c){
+    h+='<div class="staff-leg-item"><div style="width:10px;height:10px;border-radius:2px;background:'+cmap[c]+';flex-shrink:0;"></div>'+e(c)+'</div>';
+  });
+  h+='</div><div class="staff-bars-wrap"><div class="staff-bars">';
+  weekKeys.forEach(function(wk){
+    var d=new Date(wk), lbl=p2(d.getDate())+'.'+p2(d.getMonth()+1);
+    h+='<div class="staff-col"><div class="staff-stack">';
+    contractors.forEach(function(c){
+      var val=weeks[wk][c]||0;
+      if(!val) return;
+      var segH=Math.max(3,Math.round(val/maxVal*BAR_H));
+      h+='<div class="staff-seg" style="height:'+segH+'px;background:'+cmap[c]+'" title="'+e(c)+': '+val+' чел.">';
+      if(segH>=14) h+='<div class="staff-seg-lbl" style="line-height:'+segH+'px;">'+val+'</div>';
+      h+='</div>';
+    });
+    h+='</div><div class="staff-xlbl">'+lbl+'</div></div>';
+  });
+  h+='</div></div></div>';
+  return h;
 }
 
 // ─── ЧЕК-ЛИСТЫ ────────────────────────────────────────────────────

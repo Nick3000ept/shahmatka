@@ -52,6 +52,7 @@ function doGet(e) {
 
     if (action === 'clearCache') { clearCache(); return jsonOut({ok: true}); }
     if (action === 'getCheckLists') return jsonOut(getCheckLists());
+    if (action === 'getStaffing')   return jsonOut(getStaffing());
 
 
     if (action === 'checkPassword') {
@@ -349,6 +350,31 @@ function parseDate(s) {
 
 function pad(n) { return n < 10 ? '0' + n : String(n); }
 
+function getStaffing() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('sb3_staffing');
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Численность_монтажников');
+  if (!sheet) return {items: []};
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {items: []};
+  var values = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+  var items = [];
+  values.forEach(function(row) {
+    var date = formatDateOut(row[0]);
+    var contractor = String(row[1]).trim();
+    var count = parseFloat(String(row[2]).replace(',', '.'));
+    if (!date || !contractor || isNaN(count) || count <= 0) return;
+    items.push({date: date, contractor: contractor, count: count});
+  });
+  var result = {items: items};
+  try { cache.put('sb3_staffing', JSON.stringify(result), 7200); } catch(e) {}
+  return result;
+}
+
 function getCheckLists() {
   var cache = CacheService.getScriptCache();
   var cached = cache.get('sb3_checklists');
@@ -400,6 +426,7 @@ function clearCache() {
     cache.remove('sb3_rows_all');
     cache.remove('sb3_work_dict');
     cache.remove('sb3_checklists');
+    cache.remove('sb3_staffing');
     ['К1','К2','К3','К4','К5','К6','К7','К8','К9','К10','К11','К12'].forEach(function(c) {
       cache.remove('sb3_rows_' + c);
     });
