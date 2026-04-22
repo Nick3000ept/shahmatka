@@ -2114,7 +2114,8 @@ function toggleAnalytics(){
   document.getElementById('analytics-panel').classList.toggle('on',ANALYTICS_OPEN);
   document.getElementById('an-btn').classList.toggle('btn-pri',ANALYTICS_OPEN);
   if(ANALYTICS_OPEN){
-    if(!STAFFING_DATA.length) loadStaffing(function(){renderAnalytics();});
+    STAFFING_DATA=[];
+    loadStaffing(function(){renderAnalytics();});
     renderAnalytics();
   }
 }

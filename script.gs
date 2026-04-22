@@ -351,11 +351,6 @@ function parseDate(s) {
 function pad(n) { return n < 10 ? '0' + n : String(n); }
 
 function getStaffing() {
-  var cache = CacheService.getScriptCache();
-  var cached = cache.get('sb3_staffing');
-  if (cached) {
-    try { return JSON.parse(cached); } catch(e) {}
-  }
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Численность_монтажников');
   if (!sheet) return {items: []};
@@ -370,9 +365,7 @@ function getStaffing() {
     if (!date || !contractor || isNaN(count) || count <= 0) return;
     items.push({date: date, contractor: contractor, count: count});
   });
-  var result = {items: items};
-  try { cache.put('sb3_staffing', JSON.stringify(result), 300); } catch(e) {}
-  return result;
+  return {items: items};
 }
 
 function getCheckLists() {
