@@ -1772,6 +1772,15 @@ function msCommit(){
     if(MS_DRAFT.pct!==null) MOD[rid].pct=(parseInt(MS_DRAFT.pct)/100).toFixed(2).replace('.',',');
     if(dateVal) MOD[rid].dateEnd=fmtDate(dateVal);
     if(contrVal) MOD[rid].org=contrVal;
+    // Автостатус: если поставили % от 1 до 99 без изменения статуса, а текущий статус пустой → СМР начаты
+    if(MS_DRAFT.pct!==null&&MS_DRAFT.status===null){
+      var msPct=parseInt(MS_DRAFT.pct);
+      if(msPct>0&&msPct<100){
+        var origRow3=ROWS.find(r=>r.rowId===rid);
+        var curSt3=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(origRow3||{}).status||'']||'s-empty');
+        if(curSt3==='s-empty') MOD[rid].status='s-started';
+      }
+    }
     // Автодата: если статус "окончены/передано" и дата окончания пустая — ставим сегодня
     var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS.find(r=>r.rowId===rid)||{}).status||'']||'s-empty');
     if((finalSt==='s-done'||finalSt==='s-accepted')&&!MOD[rid].dateEnd){
@@ -1932,6 +1941,12 @@ function savePanel(){
     if(_dateTouched)       MOD[rid].dateEnd=dateEnd;
     if(_commentTouched)    MOD[rid].comment=comment;
     if(_contractorTouched) MOD[rid].org=contractor;
+    // Автостатус: если поставили % от 1 до 99 без изменения статуса, а текущий статус пустой → СМР начаты
+    if(_pctTouched&&!_statusTouched&&pctSlider>0&&pctSlider<100){
+      var origRow2=ROWS.find(r=>r.rowId===rid);
+      var curSt2=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(origRow2||{}).status||'']||'s-empty');
+      if(curSt2==='s-empty') MOD[rid].status='s-started';
+    }
     // Автодата: если статус "окончены/передано" и дата окончания пустая — ставим сегодня
     var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS.find(r=>r.rowId===rid)||{}).status||'']||'s-empty');
     if((finalSt==='s-done'||finalSt==='s-accepted')&&!MOD[rid].dateEnd){
