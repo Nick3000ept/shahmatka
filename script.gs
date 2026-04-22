@@ -371,7 +371,7 @@ function getStaffing() {
     items.push({date: date, contractor: contractor, count: count});
   });
   var result = {items: items};
-  try { cache.put('sb3_staffing', JSON.stringify(result), 7200); } catch(e) {}
+  try { cache.put('sb3_staffing', JSON.stringify(result), 300); } catch(e) {}
   return result;
 }
 
