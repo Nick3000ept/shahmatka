@@ -477,6 +477,16 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
       onfocus="showWorkDrop()">
     <div class="work-drop" id="work-drop" style="display:none" onmousedown="event.stopPropagation()"></div>
   </div>
+  <div class="fsep"></div>
+  <span class="fl">Статус:</span>
+  <div class="chips" id="fstatus-chips">
+    <span class="chip" data-st="s-empty"    onclick="toggleFStatus('s-empty')"><span class="sc-dot" style="background:#94a3b8;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Без статуса</span>
+    <span class="chip" data-st="s-started"  onclick="toggleFStatus('s-started')"><span class="sc-dot" style="background:#eab308;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Начаты</span>
+    <span class="chip" data-st="s-done"     onclick="toggleFStatus('s-done')"><span class="sc-dot" style="background:#16a34a;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Окончены</span>
+    <span class="chip" data-st="s-accepted" onclick="toggleFStatus('s-accepted')"><span class="sc-dot" style="background:#166534;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Передано</span>
+    <span class="chip" data-st="s-remarks"  onclick="toggleFStatus('s-remarks')"><span class="sc-dot" style="background:#ef4444;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Замечания</span>
+    <span class="chip" data-st="s-onsite"   onclick="toggleFStatus('s-onsite')"><span class="sc-dot" style="background:#3b82f6;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>На площадке</span>
+  </div>
 </div>
 
 <!-- FILTER TAGS BAR -->
@@ -702,7 +712,7 @@ var _contractorTouched = false; // был ли подрядчик изменён
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = []; // порядок строк
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, SHOW_CL=false;
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, SHOW_CL=false;
 var CHECK_LISTS=[], CL_MAP={}, STAFFING_DATA=[];
 var WORKS=[];
 
@@ -936,6 +946,21 @@ function applyFilters(){
   FL2=document.getElementById('flvl2').value;
   render();
 }
+function toggleFStatus(st){
+  if(FSTATUS.has(st)) FSTATUS.delete(st); else FSTATUS.add(st);
+  document.querySelectorAll('#fstatus-chips .chip').forEach(function(ch){
+    ch.classList.toggle('on', FSTATUS.has(ch.dataset.st));
+  });
+  ACTIVE_PRESET=null;
+  renderPresetChips();
+  renderFilterTags();
+  render();
+}
+function syncFStatusChips(){
+  document.querySelectorAll('#fstatus-chips .chip').forEach(function(ch){
+    ch.classList.toggle('on', FSTATUS.has(ch.dataset.st));
+  });
+}
 
 function applyFiltersAndTags(){
   FO=document.getElementById('forg').value;
@@ -954,9 +979,10 @@ function renderFilterTags(){
   if(FM) tags.push({label:'Место: '+FM, clear:function(){document.getElementById('fplace').value='';FM='';applyFiltersAndTags();}});
   if(FL1) tags.push({label:'Вид: '+FL1, clear:function(){document.getElementById('flvl1').value='';FL1='';applyFiltersAndTags();}});
   if(FL2) tags.push({label:'Группа работ: '+FL2, clear:function(){document.getElementById('flvl2').value='';FL2='';applyFiltersAndTags();}});
+  if(FSTATUS.size>0){var _stLabels={'s-empty':'Без статуса','s-started':'Начаты','s-done':'Окончены','s-accepted':'Передано','s-remarks':'Замечания','s-onsite':'На площадке'};tags.push({label:'Статус: '+[...FSTATUS].map(function(s){return _stLabels[s]||s;}).join(', '),clear:function(){FSTATUS.clear();syncFStatusChips();applyFiltersAndTags();}});}
   var bar=document.getElementById('filter-tags-bar');
   var list=document.getElementById('filter-tags-list');
-  if(!tags.length&&FW.size===0){bar.style.display='none';return;}
+  if(!tags.length&&FW.size===0&&FSTATUS.size===0){bar.style.display='none';return;}
   bar.style.display='flex';
   list.innerHTML=tags.map(function(t,i){
     return '<span class="filter-tag">'+e(t.label)+'<span class="filter-tag-x" onclick="clearFilterTag('+i+')">✕</span></span>';
@@ -1066,7 +1092,7 @@ function loadPresets(){
 }
 function applyNoFilter(){
   ACTIVE_PRESET='__none__';
-  FC.clear(); FO=''; FM=''; FL1=''; FL2=''; FKP=false; FW.clear();
+  FC.clear(); FO=''; FM=''; FL1=''; FL2=''; FKP=false; FW.clear(); FSTATUS.clear();
   document.getElementById('forg').value='';
   document.getElementById('fplace').value='';
   document.getElementById('flvl1').value='';
@@ -1074,6 +1100,7 @@ function applyNoFilter(){
   document.querySelectorAll('#fc .chip').forEach(function(ch){
     ch.classList.toggle('on', ch.dataset.corpus==='');
   });
+  syncFStatusChips();
   updateWorkInp();
   renderPresetChips();
   renderFilterTags();
@@ -1119,7 +1146,8 @@ function savePreset(){
     lvl1:FL1,
     lvl2:FL2,
     works:[...FW],
-    kp:FKP
+    kp:FKP,
+    statuses:[...FSTATUS]
   };
   localStorage.setItem('sb3_presets',JSON.stringify(PRESETS));
   renderPresetChips();
@@ -1130,7 +1158,7 @@ function applyPreset(name){
   // Повторный клик — снимаем фильтры
   if(ACTIVE_PRESET===name){
     ACTIVE_PRESET=null;
-    FC.clear(); FO=''; FM=''; FL1=''; FL2=''; FKP=false; FW.clear();
+    FC.clear(); FO=''; FM=''; FL1=''; FL2=''; FKP=false; FW.clear(); FSTATUS.clear();
     document.getElementById('forg').value='';
     document.getElementById('fplace').value='';
     document.getElementById('flvl1').value='';
@@ -1139,6 +1167,7 @@ function applyPreset(name){
     document.querySelectorAll('#fc .chip').forEach(function(ch){
       ch.classList.toggle('on', ch.dataset.corpus==='');
     });
+    syncFStatusChips();
     updateWorkInp();
     renderPresetChips();
     renderFilterTags();
@@ -1165,6 +1194,10 @@ function applyPreset(name){
   // Работы
   FW.clear();
   (p.works||[]).forEach(function(w){FW.add(w);});
+  // Статусы
+  FSTATUS.clear();
+  (p.statuses||[]).forEach(function(s){FSTATUS.add(s);});
+  syncFStatusChips();
   updateWorkInp();
   renderPresetChips();
   renderFilterTags();
@@ -1191,6 +1224,7 @@ function render(){
     if(FL2&&r.lvl2!==FL2) return false;
     if(FW.size>0&&!FW.has(r.work)) return false;
     if(FKP&&!r.kp) return false;
+    if(FSTATUS.size>0){var _fst=MOD[r.rowId]&&MOD[r.rowId].status!==undefined?MOD[r.rowId].status:(S2CSS[r.status||'']||'s-empty');if(!FSTATUS.has(_fst))return false;}
     if(FMOD&&!MOD[r.rowId]) return false;
     // Фильтр по дате: показываем строку если хотя бы одна из дат <= указанной
     if(fdateMs){
@@ -2150,6 +2184,7 @@ function renderAnalytics(){
     if(FL2&&r.lvl2!==FL2) return false;
     if(FW.size>0&&!FW.has(r.work)) return false;
     if(FKP&&!r.kp) return false;
+    if(FSTATUS.size>0){var _fst2=MOD[r.rowId]&&MOD[r.rowId].status!==undefined?MOD[r.rowId].status:(S2CSS[r.status||'']||'s-empty');if(!FSTATUS.has(_fst2))return false;}
     if(FMOD&&!MOD[r.rowId]) return false;
     if(fdateMs){
       var d1=r.baseDate?parseDateMs(fmtDate(r.baseDate)):0;
