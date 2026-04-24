@@ -277,6 +277,9 @@ td.cell.s-onsite .c-date{color:#1e40af;}
 /* Прогресс снизу — толще и заметнее */
 .c-bar{position:absolute;bottom:0;left:0;right:0;height:4px;background:rgba(0,0,0,.06);}
 .c-bar-fill{height:100%;}
+/* Режим "Пусто" — только цвет, половина высоты */
+table.empty-mode tbody tr{height:21px;}
+table.empty-mode .ci,table.empty-mode .c-bar{display:none;}
 td.cell.s-done .c-bar-fill{background:#22c55e;}
 td.cell.s-accepted .c-bar-fill{background:#15803d;}
 td.cell.s-onsite .c-bar-fill{background:#3b82f6;}
@@ -514,6 +517,10 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     Показать ЧЛ
   </label>
   <label class="chk-lbl">
+    <input type="checkbox" id="fempty" onchange="SHOW_EMPTY=this.checked;render();">
+    Пусто
+  </label>
+  <label class="chk-lbl">
     <input type="checkbox" id="foverdue" onchange="FOVERDUE=this.checked;render();">
     Просрочено
   </label>
@@ -712,7 +719,7 @@ var _contractorTouched = false; // был ли подрядчик изменён
 var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = []; // порядок строк
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, SHOW_CL=false;
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, SHOW_CL=false, SHOW_EMPTY=false;
 var CHECK_LISTS=[], CL_MAP={}, STAFFING_DATA=[];
 var WORKS=[];
 
@@ -1519,6 +1526,7 @@ function render(){
 
   h+='</tbody>';
   board.innerHTML=h;
+  board.classList.toggle('empty-mode',SHOW_EMPTY);
   renderSB(rows);
   renderUnsaved();
   updateMsBar();
