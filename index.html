@@ -424,33 +424,6 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
 .toast.err{background:#fef2f2;border:1px solid #fecaca;color:var(--red);}
 .toast.inf{background:#eff6ff;border:1px solid #bfdbfe;color:var(--acc);}
 
-/* ── PDF MODAL ── */
-.pdf-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:none;align-items:center;justify-content:center;}
-.pdf-overlay.on{display:flex;}
-.pdf-box{background:#fff;border-radius:10px;padding:24px 28px;min-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.18);}
-.pdf-box h3{margin:0 0 16px;font-size:15px;font-weight:700;color:var(--ink);}
-.pdf-opts{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
-.pdf-opt{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;color:var(--ink);}
-.pdf-opt input[type=radio]{accent-color:var(--acc);width:16px;height:16px;cursor:pointer;}
-.pdf-actions{display:flex;gap:8px;justify-content:flex-end;}
-
-/* ── PRINT HEADER ── */
-#print-header{display:none;padding:0 0 8px 0;border-bottom:2px solid #1a1d24;margin-bottom:10px;}
-#print-header .ph-title{font-size:16px;font-weight:800;letter-spacing:.05em;color:#1a1d24;}
-#print-header .ph-meta{font-size:10px;color:#555;margin-top:3px;}
-
-/* ── @MEDIA PRINT ── */
-@media print {
-  @page{size:landscape;margin:1cm 1.2cm;}
-  .topbar,.filterbar,.checkbar,.filter-tags-bar,#msbar,#loader,#toasts,#popover,#pwd-overlay,#analytics-panel,.pdf-overlay{display:none!important;}
-  body{overflow:visible!important;height:auto!important;}
-  #zoom-wrap{transform:none!important;height:auto!important;}
-  .board-wrap{overflow:visible!important;height:auto!important;}
-  #print-header{display:block!important;}
-  body.pdf-no-content .ci{visibility:hidden!important;}
-  body.pdf-no-content .c-bar{display:none!important;}
-}
-
 </style>
 </head>
 <body>
@@ -476,7 +449,6 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <input class="url-input" id="author-inp" placeholder="Ваше имя…" style="width:130px;" oninput="saveAuthor(this.value)">
     <div class="sep"></div>
     <button class="btn" id="an-btn" onclick="toggleAnalytics()" style="font-size:11px;">📊 Аналитика</button>
-    <button class="btn" onclick="openPdfModal()" style="font-size:11px;">🖨 PDF</button>
   </div>
 </div>
 
@@ -595,12 +567,6 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
 
 <!-- HINT -->
 
-<!-- PRINT HEADER (visible only @media print) -->
-<div id="print-header">
-  <div class="ph-title">СБ3 · Шахматка</div>
-  <div class="ph-meta" id="print-meta"></div>
-</div>
-
 <!-- BOARD -->
 <div class="board-wrap" id="bwrap">
   <div class="loader" id="loader"><div class="spin"></div><div class="loader-txt" id="loader-txt">Загрузка…</div></div>
@@ -699,23 +665,6 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
 </div>
 
 <div class="toasts" id="toasts"></div>
-
-<!-- PDF MODAL -->
-<div class="pdf-overlay" id="pdf-overlay" onclick="if(event.target===this)closePdfModal()">
-  <div class="pdf-box">
-    <h3>Выгрузка в PDF</h3>
-    <div class="pdf-opts">
-      <label class="pdf-opt"><input type="radio" name="pdf-content" value="dates" checked> Даты</label>
-      <label class="pdf-opt"><input type="radio" name="pdf-content" value="org"> Подрядчики</label>
-      <label class="pdf-opt"><input type="radio" name="pdf-content" value="vol"> Объёмы</label>
-      <label class="pdf-opt"><input type="radio" name="pdf-content" value="nothing"> Ничего (только цвет)</label>
-    </div>
-    <div class="pdf-actions">
-      <button class="btn" onclick="closePdfModal()">Отмена</button>
-      <button class="btn btn-pri" onclick="doPrint()">🖨 Распечатать</button>
-    </div>
-  </div>
-</div>
 
 <script>
 // ─── ZOOM ─────────────────────────────────────────────────────────
@@ -2506,47 +2455,6 @@ function openClPanel(clItems, anchorEl, row){
 }
 function closeClPanel(){document.getElementById('cl-pop').classList.remove('on');}
 function clOpenLink(url){if(url) window.open(url,'_blank');}
-
-// ─── PDF EXPORT ───────────────────────────────────────────────────
-function openPdfModal(){
-  document.getElementById('pdf-overlay').classList.add('on');
-}
-function closePdfModal(){
-  document.getElementById('pdf-overlay').classList.remove('on');
-}
-function doPrint(){
-  var sel=document.querySelector('input[name="pdf-content"]:checked').value;
-  // Сохраняем текущее состояние отображения
-  var wasSP=SHOW_SP, wasVOL=SHOW_VOL;
-  // Устанавливаем режим под выбор
-  SHOW_SP=(sel==='org');
-  SHOW_VOL=(sel==='vol');
-  if(sel==='nothing') document.body.classList.add('pdf-no-content');
-  render();
-  // Заполняем print-header
-  var p2=function(n){return n<10?'0'+n:String(n);};
-  var td=new Date();
-  var dateStr=p2(td.getDate())+'.'+p2(td.getMonth()+1)+'.'+td.getFullYear();
-  var parts=[];
-  if(FC.size>0) parts.push('Корпус: '+[...FC].join(', '));
-  if(FO) parts.push('Орг: '+FO);
-  if(FM) parts.push('Место: '+FM);
-  if(FL1) parts.push('Вид: '+FL1);
-  if(FL2) parts.push('Группа: '+FL2);
-  if(FSTATUS.size>0){
-    var stL={'s-empty':'Без статуса','s-started':'Начаты','s-done':'Окончены','s-accepted':'Передано','s-remarks':'Замечания','s-onsite':'На площадке'};
-    parts.push('Статус: '+[...FSTATUS].map(function(s){return stL[s]||s;}).join(', '));
-  }
-  if(FW.size>0) parts.push('Работы: '+[...FW].join(', '));
-  document.getElementById('print-meta').textContent='Дата: '+dateStr+(parts.length?' · Фильтры: '+parts.join(' | '):'');
-  closePdfModal();
-  window.print();
-  // Восстанавливаем состояние
-  document.body.classList.remove('pdf-no-content');
-  SHOW_SP=wasSP;
-  SHOW_VOL=wasVOL;
-  render();
-}
 </script>
 
 <!-- CHECKLIST POPUP -->
