@@ -704,6 +704,8 @@ var _contractorTouched = false; // был ли подрядчик изменён
 var COL_KEYS = [];      // [{colIdx, corpus, work}] — порядок столбцов в таблице
 var FLOOR_LIST = [];    // порядок строк
 var VISIBLE_ROWS = [];  // строки после применения фильтров (обновляется в render)
+var CELL_MAP = new Map();    // rowId → td element, перестраивается в render()
+var FLOOR_ROW_MAP = new Map(); // floor → [rowId], перестраивается в render()
 
 var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, SHOW_CL=false, SHOW_EMPTY=false;
 var CHECK_LISTS=[], CL_MAP={}, STAFFING_DATA=[];
@@ -1513,6 +1515,11 @@ function render(){
   h+='</tbody>';
   board.innerHTML=h;
   board.classList.toggle('empty-mode',SHOW_EMPTY);
+  // Строим Map rid→td и floor→[rid] один раз после render
+  CELL_MAP.clear(); FLOOR_ROW_MAP.clear();
+  board.querySelectorAll('td.cell').forEach(td=>{var rid=td.dataset.rid;if(rid)CELL_MAP.set(rid,td);});
+  board.querySelectorAll('td.rh').forEach(td=>{var fl=td.dataset.floor;if(fl){if(!FLOOR_ROW_MAP.has(fl))FLOOR_ROW_MAP.set(fl,[]);FLOOR_ROW_MAP.get(fl);}});
+  VISIBLE_ROWS.forEach(r=>{var fl=String(r.floor);if(!FLOOR_ROW_MAP.has(fl))FLOOR_ROW_MAP.set(fl,[]);FLOOR_ROW_MAP.get(fl).push(r.rowId);});
   renderSB(rows);
   renderUnsaved();
   updateMsBar();
@@ -1641,8 +1648,8 @@ function toggleCol(colIdx, ev){
 }
 
 function isRowSelected(fl){
-  var rowIds=VISIBLE_ROWS.filter(r=>parseFloat(String(r.floor).replace(',','.'))=== fl).map(r=>r.rowId);
-  return rowIds.length&&rowIds.every(rid=>SEL.has(rid));
+  var rowIds=FLOOR_ROW_MAP.get(String(fl))||[];
+  return rowIds.length>0&&rowIds.every(rid=>SEL.has(rid));
 }
 function isColSelected(colIdx){
   var col=COL_KEYS[colIdx]; if(!col) return false;
@@ -1683,15 +1690,18 @@ function resetMsDraft(){
 }
 
 function updateCellSel(){
-  document.querySelectorAll('td.cell').forEach(td=>{
-    var rid=td.dataset.rid;
-    if(rid) td.classList.toggle('sel',SEL.has(rid));
+  // Снимаем sel только с ячеек у которых он был — не трогаем остальные
+  board.querySelectorAll('td.cell.sel').forEach(td=>{
+    if(!SEL.has(td.dataset.rid)) td.classList.remove('sel');
   });
-  document.querySelectorAll('td.rh').forEach(td=>{
-    var fl=parseFloat(td.dataset.floor);
-    if(!isNaN(fl)) td.classList.toggle('row-sel',isRowSelected(fl));
+  // Добавляем sel через Map — O(1) на ячейку
+  SEL.forEach(rid=>{var td=CELL_MAP.get(rid);if(td)td.classList.add('sel');});
+  // Заголовки строк — обновляем через FLOOR_ROW_MAP
+  board.querySelectorAll('td.rh').forEach(td=>{
+    var fl=td.dataset.floor;
+    if(fl) td.classList.toggle('row-sel',isRowSelected(fl));
   });
-  document.querySelectorAll('th.h-work').forEach(th=>{
+  board.querySelectorAll('th.h-work').forEach(th=>{
     var ci=parseInt(th.dataset.colidx);
     if(!isNaN(ci)) th.classList.toggle('col-sel',isColSelected(ci));
   });
@@ -1963,7 +1973,7 @@ function savePanel(){
     if(Object.keys(MOD[rid]).length===0) delete MOD[rid];
   });
 
-  closePanel();render();
+  clearSel(true);closePanel();render();
   updateSaveBtn();
 }
 
