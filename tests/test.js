@@ -41,14 +41,14 @@ function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 function statusShort(s){
   if(s==='s-done')     return 'Окончены';
   if(s==='s-started')  return 'Начаты';
-  if(s==='s-accepted') return 'Передано';
+  if(s==='s-front')    return 'Фронт открыт';
   if(s==='s-onsite')   return 'На площадке';
   if(s==='s-remarks')  return 'Замечания';
   return '';
 }
 
-var S2CSS={'СМР окончены':'s-done','СМР начаты':'s-started','Передано':'s-accepted','Замечания':'s-remarks','На площадке':'s-onsite','':'s-empty'};
-var CSS2S={'s-done':'СМР окончены','s-started':'СМР начаты','s-accepted':'Передано','s-remarks':'Замечания','s-onsite':'На площадке','s-empty':''};
+var S2CSS={'СМР окончены':'s-done','СМР начаты':'s-started','Фронт открыт':'s-front','Замечания':'s-remarks','На площадке':'s-onsite','':'s-empty'};
+var CSS2S={'s-done':'СМР окончены','s-started':'СМР начаты','s-front':'Фронт открыт','s-remarks':'Замечания','s-onsite':'На площадке','s-empty':''};
 
 var PLACE_ORDER={'Этаж':1,'МОП':2,'Квартира':3};
 function colKeySort(a, b){
@@ -110,7 +110,8 @@ test('null → пустая строка', () => assert.strictEqual(e(null), '')
 section('statusShort');
 test('s-done → Окончены', () => assert.strictEqual(statusShort('s-done'), 'Окончены'));
 test('s-started → Начаты', () => assert.strictEqual(statusShort('s-started'), 'Начаты'));
-test('s-accepted → Передано', () => assert.strictEqual(statusShort('s-accepted'), 'Передано'));
+test('s-front → Фронт открыт', () => assert.strictEqual(statusShort('s-front'), 'Фронт открыт'));
+test('s-accepted → "" (статус удалён)', () => assert.strictEqual(statusShort('s-accepted'), ''));
 test('s-onsite → На площадке', () => assert.strictEqual(statusShort('s-onsite'), 'На площадке'));
 test('s-remarks → Замечания', () => assert.strictEqual(statusShort('s-remarks'), 'Замечания'));
 test('s-empty → ""', () => assert.strictEqual(statusShort('s-empty'), ''));

@@ -233,7 +233,7 @@ td.cell.floor-sep, td.rh.floor-sep{border-top:2px solid #4b5563;}
 /* Статусы — светлая тема */
 td.cell.s-done    {background:#dcfce7;}
 td.cell.s-started {background:#fef9c3;}
-td.cell.s-accepted{background:#166534;}
+td.cell.s-front   {background:#ffffff;box-shadow:inset 0 0 0 3px #f97316;}
 td.cell.s-onsite  {background:#bfdbfe;}
 td.cell.s-remarks {background:#fee2e2;}
 td.cell.s-empty   {background:#ffffff;}
@@ -265,8 +265,6 @@ td.cell.modified::after{content:'';position:absolute;top:3px;right:3px;width:4px
 .c-date.bold{font-weight:800;color:var(--ink);}
 .c-date.overdue{color:#ef4444 !important;font-weight:700;}
 .c-date.empty{color:var(--ink3);font-size:10px;font-weight:400;}
-td.cell.s-accepted .c-date{color:#fff;}
-td.cell.s-accepted .c-base{color:rgba(255,255,255,.7);}
 td.cell.s-onsite .c-date{color:#1e40af;}
 .c-base{font-family:var(--mono);font-size:10px;font-weight:400;color:var(--ink3);white-space:nowrap;line-height:1;}
 .c-nodata-lbl{font-size:9px;color:var(--ink3);}
@@ -281,7 +279,7 @@ td.cell.s-onsite .c-date{color:#1e40af;}
 table.empty-mode tbody tr{height:21px;}
 table.empty-mode .ci,table.empty-mode .c-bar{display:none;}
 td.cell.s-done .c-bar-fill{background:#22c55e;}
-td.cell.s-accepted .c-bar-fill{background:#15803d;}
+td.cell.s-front .c-bar-fill{background:#f97316;}
 td.cell.s-onsite .c-bar-fill{background:#3b82f6;}
 td.cell.s-started .c-bar-fill{background:#eab308;}
 td.cell.s-remarks .c-bar-fill{background:#ef4444;}
@@ -486,7 +484,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <span class="chip" data-st="s-empty"    onclick="toggleFStatus('s-empty')"><span class="sc-dot" style="background:#94a3b8;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Без статуса</span>
     <span class="chip" data-st="s-started"  onclick="toggleFStatus('s-started')"><span class="sc-dot" style="background:#eab308;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Начаты</span>
     <span class="chip" data-st="s-done"     onclick="toggleFStatus('s-done')"><span class="sc-dot" style="background:#16a34a;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Окончены</span>
-    <span class="chip" data-st="s-accepted" onclick="toggleFStatus('s-accepted')"><span class="sc-dot" style="background:#166534;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Передано</span>
+    <span class="chip" data-st="s-front"    onclick="toggleFStatus('s-front')"><span class="sc-dot" style="background:#f97316;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Фронт открыт</span>
     <span class="chip" data-st="s-remarks"  onclick="toggleFStatus('s-remarks')"><span class="sc-dot" style="background:#ef4444;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>Замечания</span>
     <span class="chip" data-st="s-onsite"   onclick="toggleFStatus('s-onsite')"><span class="sc-dot" style="background:#3b82f6;width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle"></span>На площадке</span>
   </div>
@@ -544,7 +542,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <span class="ms-sc g" id="msc-done"     onclick="msDraftStatus('s-done')">✓ Окончены</span>
   <span class="ms-sc y" id="msc-started"  onclick="msDraftStatus('s-started')">▶ Начаты</span>
   <span class="ms-sc r" id="msc-remarks"  onclick="msDraftStatus('s-remarks')">✕ Замечания</span>
-  <span class="ms-sc b" id="msc-accepted" onclick="msDraftStatus('s-accepted')">★ Передано</span>
+  <span class="ms-sc admin-only" style="color:#f97316" id="msc-front" onclick="msDraftStatus('s-front')">⬛ Фронт открыт</span>
   <span class="ms-sc" style="color:#3b82f6" id="msc-onsite" onclick="msDraftStatus('s-onsite')">⬡ На площадке</span>
   <span class="ms-sc"   id="msc-empty"    onclick="msDraftStatus('s-empty')">— Сброс</span>
   <div class="ms-sep"></div>
@@ -606,7 +604,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
       <div class="scg">
         <button class="sc" id="sc-started"  onclick="selSt('s-started')"><span class="sc-dot" style="background:var(--yellow)"></span>СМР начаты</button>
         <button class="sc" id="sc-done"     onclick="selSt('s-done')"><span class="sc-dot" style="background:var(--green)"></span>СМР окончены</button>
-        <button class="sc" id="sc-accepted" onclick="selSt('s-accepted')"><span class="sc-dot" style="background:#166534"></span>Передано</button>
+        <button class="sc admin-only" id="sc-front" onclick="selSt('s-front')" style="border:2px solid #f97316"><span class="sc-dot" style="background:#f97316"></span>Фронт открыт</button>
         <button class="sc" id="sc-onsite"   onclick="selSt('s-onsite')"><span class="sc-dot" style="background:#3b82f6"></span>На площадке</button>
         <button class="sc" id="sc-remarks"  onclick="selSt('s-remarks')"><span class="sc-dot" style="background:var(--red)"></span>Замечания</button>
         <button class="sc full" id="sc-empty" onclick="selSt('s-empty')"><span class="sc-dot" style="background:var(--ink3)"></span>Нет данных</button>
@@ -645,7 +643,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   </div>
   <div class="po-meta" id="po-meta"></div>
   <div class="po-footer">
-    <button class="btn" onclick="closePanel()">Отмена</button>
+    <button class="btn" onclick="clearSel();closePanel()">Отмена</button>
     <button class="btn btn-pri" onclick="savePanel()">Сохранить в таблицу</button>
   </div>
 </div>
@@ -784,8 +782,8 @@ function workSearchFilter(q){
   if(drop) drop.style.display='block';
 }
 
-var S2CSS={'СМР окончены':'s-done','СМР начаты':'s-started','Передано':'s-accepted','Замечания':'s-remarks','На площадке':'s-onsite','':'s-empty'};
-var CSS2S={'s-done':'СМР окончены','s-started':'СМР начаты','s-accepted':'Передано','s-remarks':'Замечания','s-onsite':'На площадке','s-empty':''};
+var S2CSS={'СМР окончены':'s-done','СМР начаты':'s-started','Фронт открыт':'s-front','Замечания':'s-remarks','На площадке':'s-onsite','':'s-empty'};
+var CSS2S={'s-done':'СМР окончены','s-started':'СМР начаты','s-front':'Фронт открыт','s-remarks':'Замечания','s-onsite':'На площадке','s-empty':''};
 
 // ─── INIT ─────────────────────────────────────────────────────────
 window.onload=function(){
@@ -974,7 +972,7 @@ function renderFilterTags(){
   if(FM) tags.push({label:'Место: '+FM, clear:function(){document.getElementById('fplace').value='';FM='';applyFiltersAndTags();}});
   if(FL1) tags.push({label:'Вид: '+FL1, clear:function(){document.getElementById('flvl1').value='';FL1='';applyFiltersAndTags();}});
   if(FL2) tags.push({label:'Группа работ: '+FL2, clear:function(){document.getElementById('flvl2').value='';FL2='';applyFiltersAndTags();}});
-  if(FSTATUS.size>0){var _stLabels={'s-empty':'Без статуса','s-started':'Начаты','s-done':'Окончены','s-accepted':'Передано','s-remarks':'Замечания','s-onsite':'На площадке'};tags.push({label:'Статус: '+[...FSTATUS].map(function(s){return _stLabels[s]||s;}).join(', '),clear:function(){FSTATUS.clear();syncFStatusChips();applyFiltersAndTags();}});}
+  if(FSTATUS.size>0){var _stLabels={'s-empty':'Без статуса','s-started':'Начаты','s-done':'Окончены','s-front':'Фронт открыт','s-remarks':'Замечания','s-onsite':'На площадке'};tags.push({label:'Статус: '+[...FSTATUS].map(function(s){return _stLabels[s]||s;}).join(', '),clear:function(){FSTATUS.clear();syncFStatusChips();applyFiltersAndTags();}});}
   var bar=document.getElementById('filter-tags-bar');
   var list=document.getElementById('filter-tags-list');
   if(!tags.length&&FW.size===0&&FSTATUS.size===0){bar.style.display='none';return;}
@@ -1029,7 +1027,7 @@ function renderFloorReadiness(rows){
     stats[key].total++;
     var mod=MOD[r.rowId];
     var s=mod&&mod.status!==undefined?mod.status:(S2CSS[r.status||'']||'s-empty');
-    if(s==='s-done'||s==='s-accepted') stats[key].done++;
+    if(s==='s-done') stats[key].done++;
   });
 
   // Строим таблицу
@@ -1235,7 +1233,7 @@ function render(){
       var _todayStart=new Date();_todayStart.setHours(0,0,0,0);var _todayMs=_todayStart.getTime();
       var _mod=MOD[r.rowId];
       var _s=_mod&&_mod.status!==undefined?_mod.status:(S2CSS[r.status||'']||'s-empty');
-      var _done=_s==='s-done'||_s==='s-accepted';
+      var _done=_s==='s-done';
       var ok=(FOVERDUE&&dCur<_todayMs&&!_done)||(FPLAN7&&dCur<=_now+7*24*3600*1000)||(FPLAN30&&dCur<=_now+30*24*3600*1000);
       if(!ok) return false;
     }
@@ -1445,7 +1443,7 @@ function render(){
       // Просрочка по текущему окончанию (или фактическому если нет текущего)
       var isOverdue=false;
       var checkDate=currentDate||dateEnd;
-      if(!SHOW_SP && checkDate && s!=='s-done' && s!=='s-accepted' && s!=='s-onsite'){
+      if(!SHOW_SP && checkDate && s!=='s-done' && s!=='s-onsite'){
         var deMs=parseDateMs(fmtDate(checkDate));
         if(deMs && deMs < TODAY_MS) isOverdue=true;
       }
@@ -1524,14 +1522,14 @@ function render(){
 function statusShort(s){
   if(s==='s-done')     return 'Окончены';
   if(s==='s-started')  return 'Начаты';
-  if(s==='s-accepted') return 'Передано';
+  if(s==='s-front')    return 'Фронт открыт';
   if(s==='s-onsite')   return 'На площадке';
   if(s==='s-remarks')  return 'Замечания';
   return '';
 }
 
 function renderSB(rows){
-  var cnt={'s-done':0,'s-started':0,'s-accepted':0,'s-remarks':0,'s-empty':0};
+  var cnt={'s-done':0,'s-started':0,'s-front':0,'s-remarks':0,'s-empty':0};
   var volTotal=0, volDone=0;
   rows.forEach(r=>{
     var mod=MOD[r.rowId];
@@ -1540,10 +1538,10 @@ function renderSB(rows){
     var v=parseFloat(String(r.volume||'').replace(',','.'));
     if(!isNaN(v)){
       volTotal+=v;
-      if(s==='s-done'||s==='s-accepted') volDone+=v;
+      if(s==='s-done') volDone+=v;
     }
   });
-  var done=cnt['s-done']+cnt['s-accepted'];
+  var done=cnt['s-done'];
   var left=rows.length-done;
   document.getElementById('sb-total').textContent=rows.length;
   document.getElementById('sb-done').textContent=done;
@@ -1720,11 +1718,11 @@ var MS_DRAFT={status:null,dateEnd:null,pct:null};
 
 function msDraftStatus(s){
   MS_DRAFT.status=s;
-  var map={'s-done':'msc-done','s-started':'msc-started','s-remarks':'msc-remarks','s-accepted':'msc-accepted','s-empty':'msc-empty'};
+  var map={'s-done':'msc-done','s-started':'msc-started','s-remarks':'msc-remarks','s-front':'msc-front','s-empty':'msc-empty'};
   Object.values(map).forEach(id=>{var el=document.getElementById(id); if(el) el.classList.remove('act');});
   var el=document.getElementById(map[s]); if(el) el.classList.add('act');
-  // Автосвязь: СМР окончены и Передано → 100%
-  if(s==='s-done'||s==='s-accepted'){
+  // Автосвязь: СМР окончены → 100%
+  if(s==='s-done'){
     MS_DRAFT.pct='100';
     var si=document.getElementById('ms-pct-sl'); if(si) si.value=100;
     var sv=document.getElementById('ms-pct-val'); if(sv) sv.textContent='100%';
@@ -1740,7 +1738,7 @@ function msPctUpd(v){
   // Автосвязь: 100% → СМР окончены
   if(parseInt(v)===100&&MS_DRAFT.status!=='s-done'){
     MS_DRAFT.status='s-done';
-    var map={'s-done':'msc-done','s-started':'msc-started','s-remarks':'msc-remarks','s-accepted':'msc-accepted','s-empty':'msc-empty'};
+    var map={'s-done':'msc-done','s-started':'msc-started','s-remarks':'msc-remarks','s-front':'msc-front','s-empty':'msc-empty'};
     Object.values(map).forEach(id=>{var el=document.getElementById(id);if(el)el.classList.remove('act');});
     var el=document.getElementById('msc-done');if(el)el.classList.add('act');
   }
@@ -1757,7 +1755,7 @@ function msPctResetToggle(checked){
 
 function msUpdatePreview(){
   var tags=[];
-  var statusLabels={'s-done':'СМР окончены','s-started':'СМР начаты','s-accepted':'СМР приняты','s-remarks':'Замечания','s-empty':'Сброс статуса'};
+  var statusLabels={'s-done':'СМР окончены','s-started':'СМР начаты','s-front':'Фронт открыт','s-remarks':'Замечания','s-empty':'Сброс статуса'};
   if(MS_DRAFT.status!==null) tags.push('<span class="ms-tag"><span class="ms-tag-lbl">Статус:</span>'+statusLabels[MS_DRAFT.status]+'</span>');
   var dateVal=document.getElementById('ms-date').value;
   if(dateVal) tags.push('<span class="ms-tag"><span class="ms-tag-lbl">Дата:</span>'+fmtDate(dateVal).slice(0,5)+'</span>');
@@ -1791,7 +1789,7 @@ function msCommit(){
     }
     // Автодата: если статус "окончены/передано" и дата окончания пустая — ставим сегодня
     var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS.find(r=>r.rowId===rid)||{}).status||'']||'s-empty');
-    if((finalSt==='s-done'||finalSt==='s-accepted')&&!MOD[rid].dateEnd){
+    if((finalSt==='s-done')&&!MOD[rid].dateEnd){
       var origRow=ROWS.find(r=>r.rowId===rid);
       if(!origRow||!origRow.dateEnd) MOD[rid].dateEnd=_today2;
     }
@@ -1903,14 +1901,14 @@ function closePanel(){document.getElementById('popover').classList.remove('on');
 function selSt(s){
   _statusTouched=true;
   CUR_ST=s;
-  var ids={'s-done':'sc-done','s-started':'sc-started','s-accepted':'sc-accepted','s-onsite':'sc-onsite','s-remarks':'sc-remarks','s-empty':'sc-empty'};
+  var ids={'s-done':'sc-done','s-started':'sc-started','s-front':'sc-front','s-onsite':'sc-onsite','s-remarks':'sc-remarks','s-empty':'sc-empty'};
   Object.entries(ids).forEach(([k,id])=>{
     var btn=document.getElementById(id);
     btn.className='sc'+(k==='s-empty'?' full':'');
     if(k===s) btn.classList.add('act-'+k.replace('s-',''));
   });
-  // Автосвязь: СМР окончены и Передано → 100%
-  if(s==='s-done'||s==='s-accepted') setPct(100);
+  // Автосвязь: СМР окончены → 100%
+  if(s==='s-done') setPct(100);
 }
 function selStMixed(){
   CUR_ST='s-empty';
@@ -1921,13 +1919,13 @@ function selStMixed(){
 function updPct(v){
   _pctTouched=true;
   document.getElementById('pct-val').textContent=v+'%';
-  if(parseInt(v)===100&&CUR_ST!=='s-done'&&CUR_ST!=='s-accepted') selSt('s-done');
+  if(parseInt(v)===100&&CUR_ST!=='s-done') selSt('s-done');
 }
 function setPct(v){
   _pctTouched=true;
   document.getElementById('pct-sl').value=v;
   document.getElementById('pct-val').textContent=v+'%';
-  if(parseInt(v)===100&&CUR_ST!=='s-done'&&CUR_ST!=='s-accepted') selSt('s-done');
+  if(parseInt(v)===100&&CUR_ST!=='s-done') selSt('s-done');
 }
 
 function savePanel(){
@@ -1957,7 +1955,7 @@ function savePanel(){
     }
     // Автодата: если статус "окончены/передано" и дата окончания пустая — ставим сегодня
     var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS.find(r=>r.rowId===rid)||{}).status||'']||'s-empty');
-    if((finalSt==='s-done'||finalSt==='s-accepted')&&!MOD[rid].dateEnd){
+    if((finalSt==='s-done')&&!MOD[rid].dateEnd){
       var origRow=ROWS.find(r=>r.rowId===rid);
       if(!origRow||!origRow.dateEnd) MOD[rid].dateEnd=_today;
     }
@@ -2175,6 +2173,7 @@ function renderAnalytics(){
   var now=Date.now();
   var weekMs=7*24*3600*1000;
   var monthMs=30*24*3600*1000;
+  var _todayEnd=new Date(now);_todayEnd.setHours(23,59,59,999);var todayEndMs=_todayEnd.getTime();
   var byWork={};
   var totalAll=rows.length,totalDone=0;
 
@@ -2187,7 +2186,7 @@ function renderAnalytics(){
   rows.forEach(r=>{
     var mod=MOD[r.rowId];
     var s=mod&&mod.status!==undefined?mod.status:(S2CSS[r.status||'']||'s-empty');
-    var isDone=s==='s-done'||s==='s-accepted';
+    var isDone=s==='s-done';
     var work=r.work||'—';
     var corp=r.corpus||'?';
     if(!byWork[work]) byWork[work]={week:0,month:0,total:0,plan:0,place:r.place||'',lvl2:r.lvl2||'',corpora:{}};
@@ -2200,8 +2199,8 @@ function renderAnalytics(){
     byWork[work].total++;
     byWork[work].corpora[corp].total++;
     var dateEnd=mod&&mod.dateEnd!==undefined?mod.dateEnd:(r.dateEnd||'');
-    var dMs=dateEnd?parseDateMs(dateEnd):0;
-    if(dMs&&dMs<=now){
+    var dMs=dateEnd?parseDateMs(fmtDate(dateEnd)):0;
+    if(dMs&&dMs<=todayEndMs){
       var age=now-dMs;
       if(age<=weekMs){byWork[work].week++;byWork[work].corpora[corp].week++;}
       if(age<=monthMs){byWork[work].month++;byWork[work].corpora[corp].month++;}
@@ -2454,7 +2453,7 @@ function clOpenLink(url){if(url) window.open(url,'_blank');}
     </div>
     <button class="btn" onclick="closeAnalytics()" style="padding:3px 9px;font-size:12px;flex-shrink:0;">✕</button>
   </div>
-  <div class="an-note">Учитываются только статусы «СМР окончены» и «Передано». За неделю/месяц — по дате окончания.</div>
+  <div class="an-note">Учитываются только строки со статусом «СМР окончены». За неделю/месяц — по дате окончания.</div>
   <div class="an-body" id="an-body"></div>
 </div>
 
