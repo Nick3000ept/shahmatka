@@ -223,9 +223,8 @@ td.cell{
   width:var(--cw);min-width:var(--cw);
   height:30px;
   padding:0;vertical-align:top;cursor:pointer;position:relative;
-  transition:filter .08s;
 }
-td.cell:not(.s-nodata):hover{filter:brightness(1.18);}
+td.cell:not(.s-nodata):hover::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.08);pointer-events:none;}
 td.cell.gs{border-left:3px solid #1a1d24;}
 td.cell.gp{border-left:2px solid #4b5563;}
 td.cell.floor-sep, td.rh.floor-sep{border-top:2px solid #4b5563;}
@@ -706,6 +705,7 @@ var FLOOR_LIST = [];    // порядок строк
 var VISIBLE_ROWS = [];  // строки после применения фильтров (обновляется в render)
 var CELL_MAP = new Map();    // rowId → td element, перестраивается в render()
 var FLOOR_ROW_MAP = new Map(); // floor → [rowId], перестраивается в render()
+var ROWS_MAP = new Map();    // rowId → row object, перестраивается при loadData()
 
 var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, SHOW_CL=false, SHOW_EMPTY=false;
 var CHECK_LISTS=[], CL_MAP={}, STAFFING_DATA=[];
@@ -865,6 +865,7 @@ async function loadData(){
     var j=JSON.parse(txt);
     if(j.error) throw new Error(j.error);
     ROWS=j.rows||[];
+    ROWS_MAP.clear(); ROWS.forEach(r=>ROWS_MAP.set(r.rowId,r));
     buildFilters();render();
     setSt('ok','Загружено · '+new Date().toLocaleTimeString('ru')+' · '+ROWS.length+' строк');
     toast('Загружено '+ROWS.length+' строк','ok');
@@ -1589,7 +1590,7 @@ function renderUnsaved(){
 // ─── SELECTION ────────────────────────────────────────────────────
 function cellClick(ev, rowId){
   if(!IS_ADMIN){
-    var row=ROWS.find(function(r){return r.rowId===rowId;});
+    var row=ROWS_MAP.get(rowId);
     if(CONTRACTOR){
       var org=row?(row.org||''):'';
       if(org!==CONTRACTOR){
@@ -1609,7 +1610,7 @@ function cellClick(ev, rowId){
     return;
   }
   if(SHOW_CL){
-    var _clRow=ROWS.find(r=>r.rowId===rowId);
+    var _clRow=ROWS_MAP.get(rowId);
     if(_clRow&&_clRow.idFact){
       var _clKey=_clRow.corpus+'|||'+String(_clRow.floor)+'|||'+_clRow.idFact;
       var _clItems=dedupeClItems(CL_MAP[_clKey]||[]);
@@ -1629,8 +1630,8 @@ function toggleCol(colIdx, ev){
   if(!col) return;
   var rowIds=VISIBLE_ROWS.filter(r=>r.corpus===col.corpus&&(r.place||'')===col.place&&(r.lvl2||'')===col.lvl2&&r.work===col.work&&(r.extra1||'')===col.extra1).map(r=>r.rowId);
   if(!IS_ADMIN&&CONTRACTOR){
-    var skipped=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')!==CONTRACTOR;});
-    rowIds=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')===CONTRACTOR;});
+    var skipped=rowIds.filter(rid=>{var r=ROWS_MAP.get(rid);return r&&(r.org||'')!==CONTRACTOR;});
+    rowIds=rowIds.filter(rid=>{var r=ROWS_MAP.get(rid);return r&&(r.org||'')===CONTRACTOR;});
     if(skipped.length) toast('Пропущены работы других подрядчиков','inf');
     if(!rowIds.length) return;
   } else if(!IS_ADMIN&&!CONTRACTOR){
@@ -1792,15 +1793,15 @@ function msCommit(){
     if(MS_DRAFT.pct!==null&&MS_DRAFT.status===null){
       var msPct=parseInt(MS_DRAFT.pct);
       if(msPct>0&&msPct<100){
-        var origRow3=ROWS.find(r=>r.rowId===rid);
+        var origRow3=ROWS_MAP.get(rid);
         var curSt3=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(origRow3||{}).status||'']||'s-empty');
         if(curSt3==='s-empty') MOD[rid].status='s-started';
       }
     }
     // Автодата: если статус "окончены/передано" и дата окончания пустая — ставим сегодня
-    var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS.find(r=>r.rowId===rid)||{}).status||'']||'s-empty');
+    var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS_MAP.get(rid)||{}).status||'']||'s-empty');
     if((finalSt==='s-done')&&!MOD[rid].dateEnd){
-      var origRow=ROWS.find(r=>r.rowId===rid);
+      var origRow=ROWS_MAP.get(rid);
       if(!origRow||!origRow.dateEnd) MOD[rid].dateEnd=_today2;
     }
   });
@@ -1813,7 +1814,7 @@ function msCommit(){
 
 // ─── POPOVER ──────────────────────────────────────────────────────
 function openPanel(rowId, anchorEl){
-  var row=ROWS.find(r=>r.rowId===rowId);
+  var row=ROWS_MAP.get(rowId);
   if(!row) return;
   CUR=row;
 
@@ -1829,7 +1830,7 @@ function openPanel(rowId, anchorEl){
   var st=mod.status!==undefined?mod.status:(S2CSS[row.status||'']||'s-empty');
 
   if(isMulti){
-    var statuses=[...SEL].map(rid=>{var m=MOD[rid]; var r2=ROWS.find(x=>x.rowId===rid); return m&&m.status?m.status:(r2?S2CSS[r2.status||'']||'s-empty':'s-empty');});
+    var statuses=[...SEL].map(rid=>{var m=MOD[rid]; var r2=ROWS_MAP.get(rid); return m&&m.status?m.status:(r2?S2CSS[r2.status||'']||'s-empty':'s-empty');});
     var allSame=statuses.every(s=>s===statuses[0]);
     if(allSame) selSt(statuses[0]);
     else selStMixed();
@@ -1959,14 +1960,14 @@ function savePanel(){
     if(_contractorTouched) MOD[rid].org=contractor;
     // Автостатус: если поставили % от 1 до 99 без изменения статуса, а текущий статус пустой → СМР начаты
     if(_pctTouched&&!_statusTouched&&pctSlider>0&&pctSlider<100){
-      var origRow2=ROWS.find(r=>r.rowId===rid);
+      var origRow2=ROWS_MAP.get(rid);
       var curSt2=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(origRow2||{}).status||'']||'s-empty');
       if(curSt2==='s-empty') MOD[rid].status='s-started';
     }
     // Автодата: если статус "окончены/передано" и дата окончания пустая — ставим сегодня
-    var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS.find(r=>r.rowId===rid)||{}).status||'']||'s-empty');
+    var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS_MAP.get(rid)||{}).status||'']||'s-empty');
     if((finalSt==='s-done')&&!MOD[rid].dateEnd){
-      var origRow=ROWS.find(r=>r.rowId===rid);
+      var origRow=ROWS_MAP.get(rid);
       if(!origRow||!origRow.dateEnd) MOD[rid].dateEnd=_today;
     }
     // Если ничего не изменилось — не добавлять в очередь на сохранение
