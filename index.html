@@ -716,8 +716,9 @@ var _commentTouched = false;    // был ли комментарий измен
 var _contractorTouched = false; // был ли подрядчик изменён
 
 // Индексы столбцов, нужны для выбора по заголовку
-var COL_KEYS = [];   // [{colIdx, corpus, work}] — порядок столбцов в таблице
-var FLOOR_LIST = []; // порядок строк
+var COL_KEYS = [];      // [{colIdx, corpus, work}] — порядок столбцов в таблице
+var FLOOR_LIST = [];    // порядок строк
+var VISIBLE_ROWS = [];  // строки после применения фильтров (обновляется в render)
 
 var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, SHOW_CL=false, SHOW_EMPTY=false;
 var CHECK_LISTS=[], CL_MAP={}, STAFFING_DATA=[];
@@ -1266,6 +1267,7 @@ function render(){
     renderSB([]);return;
   }
   board.style.display='table'; empty.style.display='none';
+  VISIBLE_ROWS=rows;
 
   FLOOR_LIST=[...new Set(rows.map(r=>parseFloat(String(r.floor).replace(',','.'))))].filter(n=>!isNaN(n)).sort((a,b)=>b-a);
 
@@ -1289,6 +1291,10 @@ function render(){
     var po=(PLACE_ORDER[a.place]||99)-(PLACE_ORDER[b.place]||99);
     if(po!==0) return po;
     if(a.factNum!==b.factNum) return a.factNum-b.factNum;
+    var lc=(a.lvl2||'').localeCompare(b.lvl2||'',undefined,{sensitivity:'base'});
+    if(lc!==0) return lc;
+    var wc=a.work.localeCompare(b.work,undefined,{sensitivity:'base'});
+    if(wc!==0) return wc;
     return (a.extra1||'').localeCompare(b.extra1||'',undefined,{numeric:true,sensitivity:'base'});
   });
 
@@ -1632,7 +1638,7 @@ function cellClick(ev, rowId){
 }
 
 function toggleRow(fl, ev){
-  var rowIds=ROWS.filter(r=>parseFloat(String(r.floor).replace(',','.'))=== fl).map(r=>r.rowId);
+  var rowIds=VISIBLE_ROWS.filter(r=>parseFloat(String(r.floor).replace(',','.'))=== fl).map(r=>r.rowId);
   if(!IS_ADMIN&&CONTRACTOR){
     var skipped=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')!==CONTRACTOR;});
     rowIds=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')===CONTRACTOR;});
@@ -1656,7 +1662,7 @@ function toggleRow(fl, ev){
 function toggleCol(colIdx, ev){
   var col=COL_KEYS[colIdx];
   if(!col) return;
-  var rowIds=ROWS.filter(r=>r.corpus===col.corpus&&(r.place||'')===col.place&&(r.lvl2||'')===col.lvl2&&r.work===col.work&&(r.extra1||'')===col.extra1).map(r=>r.rowId);
+  var rowIds=VISIBLE_ROWS.filter(r=>r.corpus===col.corpus&&(r.place||'')===col.place&&(r.lvl2||'')===col.lvl2&&r.work===col.work&&(r.extra1||'')===col.extra1).map(r=>r.rowId);
   if(!IS_ADMIN&&CONTRACTOR){
     var skipped=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')!==CONTRACTOR;});
     rowIds=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')===CONTRACTOR;});
@@ -1677,12 +1683,12 @@ function toggleCol(colIdx, ev){
 }
 
 function isRowSelected(fl){
-  var rowIds=ROWS.filter(r=>parseFloat(String(r.floor).replace(',','.'))=== fl).map(r=>r.rowId);
+  var rowIds=VISIBLE_ROWS.filter(r=>parseFloat(String(r.floor).replace(',','.'))=== fl).map(r=>r.rowId);
   return rowIds.length&&rowIds.every(rid=>SEL.has(rid));
 }
 function isColSelected(colIdx){
   var col=COL_KEYS[colIdx]; if(!col) return false;
-  var rowIds=ROWS.filter(r=>r.corpus===col.corpus&&(r.place||'')===col.place&&(r.lvl2||'')===col.lvl2&&r.work===col.work&&(r.extra1||'')===col.extra1).map(r=>r.rowId);
+  var rowIds=VISIBLE_ROWS.filter(r=>r.corpus===col.corpus&&(r.place||'')===col.place&&(r.lvl2||'')===col.lvl2&&r.work===col.work&&(r.extra1||'')===col.extra1).map(r=>r.rowId);
   return rowIds.length&&rowIds.every(rid=>SEL.has(rid));
 }
 
