@@ -317,15 +317,6 @@ function formatDateOut(v) {
   return String(v).trim();
 }
 
-function parseDate(s) {
-  if (!s) return '';
-  var m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  if (m) return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
-  var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (m2) return new Date(parseInt(m2[1]), parseInt(m2[2]) - 1, parseInt(m2[3]));
-  return '';
-}
-
 function pad(n) { return n < 10 ? '0' + n : String(n); }
 
 function getStaffing() {

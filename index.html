@@ -668,11 +668,6 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
 <script>
 // ─── ZOOM ─────────────────────────────────────────────────────────
 var ZOOM=100;
-function changeZoom(delta){
-  ZOOM=Math.min(150,Math.max(10,ZOOM+delta));
-  applyZoom();
-  localStorage.setItem('sb3_zoom',ZOOM);
-}
 function applyZoom(){
   var s=ZOOM/100;
   var wrap=document.getElementById('zoom-wrap');
@@ -1072,10 +1067,6 @@ function renderFloorReadiness(rows){
   board.innerHTML=h;
   renderSB(rows);
 }
-function setFDate(v){
-  FDATE=v;
-  render();
-}
 function toggleFMod(){
   FMOD=!FMOD;
   var btn=document.getElementById('show-mod-btn');
@@ -1307,19 +1298,18 @@ function render(){
   });
   var hasExtra1=COL_KEYS.some(c=>c.extra1);
 
-  // Считаем макс базовую дату по каждой колонке и по каждому корпусу
-  var maxDateByCol={};  // key → макс дата
-  var maxDateByCorpus={}; // corpus → макс дата
-  COL_KEYS.forEach(c=>{
-    rows.forEach(r=>{
-      if(r.corpus===c.corpus&&r.place===c.place&&(r.lvl2||'')===c.lvl2&&r.work===c.work&&(r.extra1||'')===c.extra1&&r.baseDate){
-        var d=parseDateMs(r.baseDate);
-        if(d){
-          if(!maxDateByCol[c.key]||d>maxDateByCol[c.key]) maxDateByCol[c.key]=d;
-          if(!maxDateByCorpus[r.corpus]||d>maxDateByCorpus[r.corpus]) maxDateByCorpus[r.corpus]=d;
-        }
-      }
-    });
+  // Считаем макс базовую дату по каждой колонке и по каждому корпусу — O(n)
+  var _colKeyLookup={};
+  COL_KEYS.forEach(c=>{ _colKeyLookup[c.corpus+'|'+(c.place||'')+'|'+(c.lvl2||'')+'|'+c.work+'|'+(c.extra1||'')]=c.key; });
+  var maxDateByCol={};
+  var maxDateByCorpus={};
+  rows.forEach(r=>{
+    if(!r.baseDate) return;
+    var d=parseDateMs(r.baseDate);
+    if(!d) return;
+    var ck=_colKeyLookup[r.corpus+'|'+(r.place||'')+'|'+(r.lvl2||'')+'|'+r.work+'|'+(r.extra1||'')];
+    if(ck&&(!maxDateByCol[ck]||d>maxDateByCol[ck])) maxDateByCol[ck]=d;
+    if(!maxDateByCorpus[r.corpus]||d>maxDateByCorpus[r.corpus]) maxDateByCorpus[r.corpus]=d;
   });
 
   // THEAD — 4 или 5 уровней: Корпус → Место → Работа (→ Доп.признак) → Макс дата
@@ -1528,7 +1518,7 @@ function render(){
   renderSB(rows);
   renderUnsaved();
   updateMsBar();
-  renderAnalytics();
+  if(ANALYTICS_OPEN) renderAnalytics();
 }
 
 function statusShort(s){
@@ -1627,28 +1617,6 @@ function cellClick(ev, rowId){
   updateCellSel();
   updateMsBar();
   openPanel(rowId, ev.currentTarget||ev.target);
-}
-
-function toggleRow(fl, ev){
-  var rowIds=VISIBLE_ROWS.filter(r=>parseFloat(String(r.floor).replace(',','.'))=== fl).map(r=>r.rowId);
-  if(!IS_ADMIN&&CONTRACTOR){
-    var skipped=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')!==CONTRACTOR;});
-    rowIds=rowIds.filter(rid=>{var r=ROWS.find(x=>x.rowId===rid);return r&&(r.org||'')===CONTRACTOR;});
-    if(skipped.length) toast('Пропущены работы других подрядчиков','inf');
-    if(!rowIds.length) return;
-  } else if(!IS_ADMIN&&!CONTRACTOR){
-    openPwdModal(function(){toggleRow(fl,ev);});
-    return;
-  }
-  var allSel=rowIds.every(rid=>SEL.has(rid));
-  rowIds.forEach(rid=>{if(allSel) SEL.delete(rid); else SEL.add(rid);});
-  closePanel();
-  updateCellSel();
-  updateMsBar();
-  document.querySelectorAll('td.rh').forEach(td=>{
-    var f=parseFloat(td.dataset.floor);
-    if(f===fl) td.classList.toggle('row-sel',!allSel);
-  });
 }
 
 function toggleCol(colIdx, ev){
@@ -2037,7 +2005,7 @@ async function batchSave(rowIds){
     if(rowIds.length <= 20){
       var promises = payload.map(p=>
         fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveRow',...p})})
-          .then(r=>r.text())
+          .then(r=>{if(!r.ok) throw new Error('HTTP '+r.status); return r.text();})
           .then(t=>{try{return JSON.parse(t);}catch(e){_hasParseWarn=true;return {ok:true,_parseWarn:true};}})
       );
       var results = await Promise.all(promises);
@@ -2045,6 +2013,7 @@ async function batchSave(rowIds){
       if(err) throw new Error(err.error||'Ошибка');
     } else {
       var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveAll',rows:payload})});
+      if(!r.ok) throw new Error('HTTP '+r.status);
       var t=await r.text();
       var j; try{j=JSON.parse(t);}catch(e){_hasParseWarn=true;j={ok:true,_parseWarn:true};}
       if(!j.ok) throw new Error(j.error||'Ошибка');
@@ -2053,9 +2022,10 @@ async function batchSave(rowIds){
       }
     }
 
+    var _rowMap=new Map(ROWS.map(r=>[r.rowId,r]));
     rowIds.forEach(rid=>{
       var mod=MOD[rid];
-      var row=ROWS.find(r=>r.rowId===rid);
+      var row=_rowMap.get(rid);
       if(row&&mod){
         if(mod.status!==undefined) row.status=CSS2S[mod.status]||'';
         if(mod.pct!==undefined) row.pct=mod.pct;
