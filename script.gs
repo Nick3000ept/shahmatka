@@ -4,6 +4,7 @@
 
 const SHEET_NAME = 'СБ3_ОБЩАЯ';
 const ADMIN_PASSWORD = 'adminACCB3';
+const SK_PASSWORD    = 'priemkaCB3';
 
 const C = {
   ROW_ID    : 1,
@@ -57,7 +58,9 @@ function doGet(e) {
 
     if (action === 'checkPassword') {
       var pwd = p.pwd || '';
-      return jsonOut({ok: pwd === ADMIN_PASSWORD});
+      if (pwd === ADMIN_PASSWORD) return jsonOut({ok: true, role: 'admin'});
+      if (pwd === SK_PASSWORD)    return jsonOut({ok: true, role: 'sk'});
+      return jsonOut({ok: false});
     }
 
     try {
