@@ -52,6 +52,15 @@ function doGet(e) {
     }
 
     if (action === 'clearCache') { clearCache(); return jsonOut({ok: true}); }
+    if (action === 'debugDict') {
+      clearCache();
+      var dict = getWorkDict();
+      var keys = Object.keys(dict);
+      var q = p.q || '';
+      var match = q ? (dict[q] || null) : null;
+      var sample = keys.slice(0, 20);
+      return jsonOut({total: keys.length, query: q, match: match, sample: sample});
+    }
     if (action === 'getCheckLists') return jsonOut(getCheckLists());
     if (action === 'getStaffing')   return jsonOut(getStaffing());
 

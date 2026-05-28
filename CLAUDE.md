@@ -13,7 +13,7 @@ cd "c:/Users/User/YandexDisk/VS_hub/СБ3_Шахматка"
 clasp push --force
 clasp deploy --deploymentId AKfycbwBRlgDFkLzGfJngvBczEBLaXMxlr3l4jGai_-ZHw28EVJrogYvxsqnecuZbZS3EJdG
 # 2. Git + GitHub Pages (фронтенд деплоится автоматически после git push)
-git add index.html script.gs appsscript.json CLAUDE.md .gitignore
+git add index.html script.gs appsscript.json CLAUDE.md .gitignore .claspignore tests/test.js
 git commit -m "описание изменений"
 git push
 ```

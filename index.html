@@ -1592,6 +1592,15 @@ function renderUnsaved(){
 
 // ─── SELECTION ────────────────────────────────────────────────────
 function cellClick(ev, rowId){
+  if(SHOW_CL){
+    var _clRow=ROWS_MAP.get(rowId);
+    if(_clRow&&_clRow.idFact){
+      var _clKey=_clRow.corpus+'|||'+String(_clRow.floor)+'|||'+_clRow.idFact;
+      var _clItems=dedupeClItems(CL_MAP[_clKey]||[]);
+      if(_clItems.length>0) openClPanel(_clItems, ev.currentTarget||ev.target, _clRow);
+    }
+    return;
+  }
   if(!IS_ADMIN&&!IS_SK){
     var row=ROWS_MAP.get(rowId);
     if(CONTRACTOR){
@@ -1610,15 +1619,6 @@ function cellClick(ev, rowId){
     else SEL.add(rowId);
     updateCellSel();
     updateMsBar();
-    return;
-  }
-  if(SHOW_CL){
-    var _clRow=ROWS_MAP.get(rowId);
-    if(_clRow&&_clRow.idFact){
-      var _clKey=_clRow.corpus+'|||'+String(_clRow.floor)+'|||'+_clRow.idFact;
-      var _clItems=dedupeClItems(CL_MAP[_clKey]||[]);
-      if(_clItems.length>0) openClPanel(_clItems, ev.currentTarget||ev.target, _clRow);
-    }
     return;
   }
   clearSel();
