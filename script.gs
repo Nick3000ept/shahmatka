@@ -5,6 +5,7 @@
 const SHEET_NAME = 'СБ3_ОБЩАЯ';
 const ADMIN_PASSWORD = 'adminACCB3';
 const SK_PASSWORD    = 'priemkaCB3';
+const TASKS_SHEET    = 'Поручения';
 
 const C = {
   ROW_ID    : 1,
@@ -63,6 +64,7 @@ function doGet(e) {
     }
     if (action === 'getCheckLists') return jsonOut(getCheckLists());
     if (action === 'getStaffing')   return jsonOut(getStaffing());
+    if (action === 'getTasks')      return jsonOut(getTasks(p.all === '1'));
 
 
     if (action === 'checkPassword') {
@@ -164,6 +166,16 @@ function doPost(e) {
         lock.releaseLock();
       }
       return jsonOut({ok: true, saved: changedIndices.length, requested: rows.length});
+    }
+
+    if (body.action === 'addTask') {
+      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      return jsonOut(addTask(body));
+    }
+
+    if (body.action === 'updateTask') {
+      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      return jsonOut(updateTask(body));
     }
 
     return jsonOut({error: 'Unknown action: ' + body.action});
@@ -392,6 +404,79 @@ function getCheckLists() {
   var result = {items: items};
   try { cache.put('sb3_checklists', JSON.stringify(result), 7200); } catch(e) {}
   return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ПОРУЧЕНИЯ (лист «Поручения») — ручные задачи для протокола
+// Столбцы: A=id | B=Подрядчик | C=Текст | D=Срок | E=Статус | F=Создано | G=Автор
+// Статус: 'открыто' | 'выполнено'
+// ═══════════════════════════════════════════════════════════════════
+function ensureTasksSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(TASKS_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(TASKS_SHEET);
+    sheet.appendRow(['id', 'Подрядчик', 'Текст', 'Срок', 'Статус', 'Создано', 'Автор']);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getTasks(includeAll) {
+  var sheet = ensureTasksSheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {tasks: []};
+  var values = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  var tasks = [];
+  values.forEach(function(row) {
+    var id = String(row[0]).trim();
+    if (!id) return;
+    var status = String(row[4]).trim() || 'открыто';
+    if (!includeAll && status !== 'открыто') return;
+    tasks.push({
+      id      : id,
+      org     : String(row[1]).trim(),
+      text    : String(row[2]).trim(),
+      due     : formatDateOut(row[3]),
+      status  : status,
+      created : formatDateOut(row[5]),
+      author  : String(row[6]).trim()
+    });
+  });
+  return {tasks: tasks};
+}
+
+function addTask(body) {
+  var org  = String(body.org || '').trim();
+  var text = String(body.text || '').trim();
+  if (!org || !text) return {error: 'Укажите подрядчика и текст поручения'};
+  var sheet = ensureTasksSheet_();
+  var id = 't' + Date.now() + Math.floor(Math.random() * 1000);
+  var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy');
+  sheet.appendRow([id, org, text, String(body.due || '').trim(), 'открыто', nowStr, String(body.author || '').trim()]);
+  SpreadsheetApp.flush();
+  return {ok: true, id: id};
+}
+
+function updateTask(body) {
+  var id = String(body.id || '').trim();
+  if (!id) return {error: 'Нет id поручения'};
+  var sheet = ensureTasksSheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {error: 'Поручение не найдено'};
+  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === id) {
+      var r = i + 2;
+      if (body.status !== undefined) sheet.getRange(r, 5).setValue(String(body.status));
+      if (body.org    !== undefined) sheet.getRange(r, 2).setValue(String(body.org));
+      if (body.text   !== undefined) sheet.getRange(r, 3).setValue(String(body.text));
+      if (body.due    !== undefined) sheet.getRange(r, 4).setValue(String(body.due));
+      SpreadsheetApp.flush();
+      return {ok: true};
+    }
+  }
+  return {error: 'Поручение не найдено'};
 }
 
 function clearCache() {

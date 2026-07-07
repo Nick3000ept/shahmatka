@@ -105,6 +105,25 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .pwd-inp:focus{border-color:var(--acc);}
 .pwd-err{font-size:11px;color:var(--red);min-height:14px;}
 .pwd-btns{display:flex;gap:8px;justify-content:flex-end;}
+/* ── Модалка поручений к протоколу ── */
+.tasks-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center;}
+.tasks-overlay.on{display:flex;}
+.tasks-box{background:var(--bg2);border:1px solid var(--brd2);border-radius:10px;padding:20px;width:min(640px,94vw);max-height:88vh;display:flex;flex-direction:column;gap:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);}
+.tasks-head{display:flex;align-items:center;justify-content:space-between;}
+.tasks-title{font-size:14px;font-weight:600;color:var(--ink);}
+.tasks-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border:1px solid var(--brd);border-radius:8px;background:var(--bg);}
+.tasks-form .tf-full{grid-column:1 / -1;}
+.tasks-form label{font-size:10px;color:var(--ink3);display:block;margin-bottom:3px;}
+.tasks-form input,.tasks-form select,.tasks-form textarea{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--brd2);border-radius:var(--r);font-size:12px;outline:none;color:var(--ink);background:var(--bg2);font-family:inherit;}
+.tasks-form textarea{resize:vertical;min-height:44px;}
+.tasks-form input:focus,.tasks-form select:focus,.tasks-form textarea:focus{border-color:var(--acc);}
+.tasks-list{overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:60px;}
+.task-item{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border:1px solid var(--brd);border-radius:8px;background:var(--bg);}
+.task-item .ti-main{flex:1;min-width:0;}
+.task-item .ti-org{font-size:11px;font-weight:600;color:var(--acc);}
+.task-item .ti-text{font-size:12px;color:var(--ink);margin-top:2px;word-break:break-word;}
+.task-item .ti-meta{font-size:10px;color:var(--ink3);margin-top:3px;}
+.tasks-empty{font-size:12px;color:var(--ink3);text-align:center;padding:16px;}
 
 /* ── CHECKLIST BADGE & POPUP ── */
 .cl-badge{position:absolute;top:2px;right:2px;background:var(--acc);color:#fff;border-radius:8px;font-size:9px;font-weight:700;padding:0 4px;line-height:14px;z-index:2;font-family:var(--mono);pointer-events:none;}
@@ -451,6 +470,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <input class="url-input" id="author-inp" placeholder="Ваше имя…" style="width:130px;" oninput="saveAuthor(this.value)">
     <div class="sep"></div>
     <button class="btn" id="an-btn" onclick="toggleAnalytics()" style="font-size:11px;">📊 Аналитика</button>
+    <button class="btn admin-only" id="prot-btn" onclick="openTasksModal()" style="font-size:11px;">📋 Протокол</button>
   </div>
 </div>
 
@@ -662,6 +682,35 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   </div>
 </div>
 
+<!-- МОДАЛКА ПОРУЧЕНИЙ К ПРОТОКОЛУ -->
+<div class="tasks-overlay" id="tasks-overlay">
+  <div class="tasks-box">
+    <div class="tasks-head">
+      <div class="tasks-title">📋 Поручения к протоколу</div>
+      <button class="btn" onclick="closeTasksModal()">✕</button>
+    </div>
+    <div class="tasks-form">
+      <div class="tf-full">
+        <label>Подрядчик</label>
+        <select id="task-org"><option value="">— выберите —</option></select>
+      </div>
+      <div class="tf-full">
+        <label>Текст поручения</label>
+        <textarea id="task-text" placeholder="Что нужно сделать…"></textarea>
+      </div>
+      <div>
+        <label>Срок</label>
+        <input type="date" id="task-due">
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <button class="btn btn-pri" style="width:100%;" onclick="addTaskSubmit()">+ Добавить поручение</button>
+      </div>
+    </div>
+    <div class="tasks-title" style="font-size:12px;">Открытые поручения</div>
+    <div class="tasks-list" id="tasks-list"><div class="tasks-empty">Загрузка…</div></div>
+  </div>
+</div>
+
 <div class="toasts" id="toasts"></div>
 
 <script>
@@ -684,6 +733,7 @@ var AUTHOR='';
 var CONTRACTOR=new URLSearchParams(window.location.search).get('contractor')||'';
 var IS_ADMIN=sessionStorage.getItem('sb3_admin')==='1';
 var IS_SK=sessionStorage.getItem('sb3_sk')==='1';
+var ADMIN_PWD=sessionStorage.getItem('sb3_admin_pwd')||'';
 var _pwdCallback=null;
 // Сегодня в миллисекундах (без времени)
 var _t=new Date(); _t.setHours(0,0,0,0);
@@ -2113,6 +2163,8 @@ async function submitPwd(){
       } else {
         IS_ADMIN=true;
         sessionStorage.setItem('sb3_admin','1');
+        ADMIN_PWD=pwd;
+        sessionStorage.setItem('sb3_admin_pwd',pwd);
       }
       applyRoleUI();
       closePwdModal();
@@ -2124,6 +2176,78 @@ async function submitPwd(){
   }catch(ex){
     document.getElementById('pwd-err').textContent='Ошибка соединения';
   }
+}
+
+// ─── ПОРУЧЕНИЯ К ПРОТОКОЛУ ────────────────────────────────────────
+var TASKS=[];
+function openTasksModal(){
+  if(!IS_ADMIN){ toast('Только для администратора','err'); return; }
+  // Заполняем список подрядчиков
+  var sel=document.getElementById('task-org');
+  sel.innerHTML='<option value="">— выберите —</option>';
+  CONTRACTORS.forEach(function(c){ sel.innerHTML+='<option value="'+e(c)+'">'+e(c)+'</option>'; });
+  document.getElementById('task-text').value='';
+  document.getElementById('task-due').value='';
+  document.getElementById('tasks-overlay').classList.add('on');
+  loadTasks();
+}
+function closeTasksModal(){ document.getElementById('tasks-overlay').classList.remove('on'); }
+
+async function loadTasks(){
+  var box=document.getElementById('tasks-list');
+  box.innerHTML='<div class="tasks-empty">Загрузка…</div>';
+  try{
+    var r=await fetch(BASE+'?action=getTasks&t='+Date.now());
+    var j=JSON.parse(await r.text());
+    TASKS=j.tasks||[];
+    renderTasksList();
+  }catch(ex){
+    box.innerHTML='<div class="tasks-empty">Ошибка загрузки</div>';
+  }
+}
+function renderTasksList(){
+  var box=document.getElementById('tasks-list');
+  if(!TASKS.length){ box.innerHTML='<div class="tasks-empty">Открытых поручений нет</div>'; return; }
+  box.innerHTML=TASKS.map(function(t){
+    return '<div class="task-item">'+
+      '<div class="ti-main">'+
+        '<div class="ti-org">'+e(t.org)+'</div>'+
+        '<div class="ti-text">'+e(t.text)+'</div>'+
+        '<div class="ti-meta">'+(t.due?'Срок: '+e(t.due)+' · ':'')+'создано '+e(t.created)+(t.author?' · '+e(t.author):'')+'</div>'+
+      '</div>'+
+      '<button class="btn" onclick="markTaskDone(\''+e(t.id)+'\')">✓ Выполнено</button>'+
+    '</div>';
+  }).join('');
+}
+async function addTaskSubmit(){
+  var org=document.getElementById('task-org').value.trim();
+  var text=document.getElementById('task-text').value.trim();
+  var due=document.getElementById('task-due').value;
+  if(!org){ toast('Выберите подрядчика','err'); return; }
+  if(!text){ toast('Введите текст поручения','err'); return; }
+  try{
+    var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+      action:'addTask', pwd:ADMIN_PWD, org:org, text:text, due:due?fmtDate(due):'', author:AUTHOR
+    })});
+    var j=JSON.parse(await r.text());
+    if(j.error){ toast(j.error,'err'); return; }
+    document.getElementById('task-text').value='';
+    document.getElementById('task-due').value='';
+    toast('Поручение добавлено','ok');
+    loadTasks();
+  }catch(ex){ toast('Ошибка сохранения','err'); }
+}
+async function markTaskDone(id){
+  try{
+    var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+      action:'updateTask', pwd:ADMIN_PWD, id:id, status:'выполнено'
+    })});
+    var j=JSON.parse(await r.text());
+    if(j.error){ toast(j.error,'err'); return; }
+    TASKS=TASKS.filter(function(t){ return t.id!==id; });
+    renderTasksList();
+    toast('Отмечено выполненным','ok');
+  }catch(ex){ toast('Ошибка','err'); }
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────
