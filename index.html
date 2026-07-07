@@ -105,19 +105,22 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .pwd-inp:focus{border-color:var(--acc);}
 .pwd-err{font-size:11px;color:var(--red);min-height:14px;}
 .pwd-btns{display:flex;gap:8px;justify-content:flex-end;}
-/* ── Модалка поручений к протоколу ── */
-.tasks-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center;}
-.tasks-overlay.on{display:flex;}
-.tasks-box{background:var(--bg2);border:1px solid var(--brd2);border-radius:10px;padding:20px;width:min(640px,94vw);max-height:88vh;display:flex;flex-direction:column;gap:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);}
-.tasks-head{display:flex;align-items:center;justify-content:space-between;}
-.tasks-title{font-size:14px;font-weight:600;color:var(--ink);}
-.tasks-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border:1px solid var(--brd);border-radius:8px;background:var(--bg);}
-.tasks-form .tf-full{grid-column:1 / -1;}
-.tasks-form label{font-size:10px;color:var(--ink3);display:block;margin-bottom:3px;}
-.tasks-form input,.tasks-form select,.tasks-form textarea{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--brd2);border-radius:var(--r);font-size:12px;outline:none;color:var(--ink);background:var(--bg2);font-family:inherit;}
-.tasks-form textarea{resize:vertical;min-height:44px;}
-.tasks-form input:focus,.tasks-form select:focus,.tasks-form textarea:focus{border-color:var(--acc);}
-.tasks-list{overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:60px;}
+/* ── Панель поручений к протоколу (справа, как аналитика) ── */
+.prot-panel{display:none;position:fixed;top:0;right:0;width:520px;max-width:96vw;height:100vh;background:var(--bg2);border-left:1px solid var(--brd);z-index:490;flex-direction:column;box-shadow:-6px 0 28px rgba(0,0,0,.1);}
+.prot-panel.on{display:flex;}
+.prot-body{overflow-y:auto;flex:1;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+.prot-rows{display:flex;flex-direction:column;gap:8px;}
+.prot-row{display:flex;gap:8px;align-items:stretch;}
+.prot-text{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:8px;font-size:12px;outline:none;color:var(--ink);background:var(--bg);font-family:inherit;resize:vertical;min-height:46px;}
+.prot-text:focus{border-color:var(--acc);}
+.prot-side{display:flex;flex-direction:column;gap:5px;width:150px;flex-shrink:0;}
+.prot-org{padding:6px 8px;border:1px solid var(--brd2);border-radius:14px;font-size:11px;outline:none;color:var(--acc);background:var(--bg3);font-weight:600;cursor:pointer;}
+.prot-org:focus{border-color:var(--acc);}
+.prot-date{padding:5px 8px;border:1px solid var(--brd2);border-radius:8px;font-size:11px;outline:none;color:var(--ink);background:var(--bg2);font-family:inherit;}
+.prot-date:focus{border-color:var(--acc);}
+.prot-actions{display:flex;justify-content:flex-end;padding-top:2px;}
+.prot-open-title{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:12px;padding-top:12px;border-top:1px solid var(--brd);}
+.prot-open{display:flex;flex-direction:column;gap:6px;}
 .task-item{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border:1px solid var(--brd);border-radius:8px;background:var(--bg);}
 .task-item .ti-main{flex:1;min-width:0;}
 .task-item .ti-org{font-size:11px;font-weight:600;color:var(--acc);}
@@ -470,7 +473,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <input class="url-input" id="author-inp" placeholder="Ваше имя…" style="width:130px;" oninput="saveAuthor(this.value)">
     <div class="sep"></div>
     <button class="btn" id="an-btn" onclick="toggleAnalytics()" style="font-size:11px;">📊 Аналитика</button>
-    <button class="btn admin-only" id="prot-btn" onclick="openTasksModal()" style="font-size:11px;">📋 Протокол</button>
+    <button class="btn admin-only" id="prot-btn" onclick="toggleProt()" style="font-size:11px;">📋 Протокол</button>
   </div>
 </div>
 
@@ -682,32 +685,22 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   </div>
 </div>
 
-<!-- МОДАЛКА ПОРУЧЕНИЙ К ПРОТОКОЛУ -->
-<div class="tasks-overlay" id="tasks-overlay">
-  <div class="tasks-box">
-    <div class="tasks-head">
-      <div class="tasks-title">📋 Поручения к протоколу</div>
-      <button class="btn" onclick="closeTasksModal()">✕</button>
+<!-- ПАНЕЛЬ ПОРУЧЕНИЙ К ПРОТОКОЛУ (справа) -->
+<div id="prot-panel" class="prot-panel">
+  <div class="an-head">
+    <div>
+      <div class="an-title">📋 Поручения к протоколу</div>
+      <div class="an-sub">Впишите поручение, справа выберите подрядчика и дату. Новая строка появится сама.</div>
     </div>
-    <div class="tasks-form">
-      <div class="tf-full">
-        <label>Подрядчик</label>
-        <select id="task-org"><option value="">— выберите —</option></select>
-      </div>
-      <div class="tf-full">
-        <label>Текст поручения</label>
-        <textarea id="task-text" placeholder="Что нужно сделать…"></textarea>
-      </div>
-      <div>
-        <label>Срок</label>
-        <input type="date" id="task-due">
-      </div>
-      <div style="display:flex;align-items:flex-end;">
-        <button class="btn btn-pri" style="width:100%;" onclick="addTaskSubmit()">+ Добавить поручение</button>
-      </div>
+    <button class="btn" onclick="closeProt()" style="padding:3px 9px;font-size:12px;flex-shrink:0;">✕</button>
+  </div>
+  <div class="prot-body">
+    <div class="prot-rows" id="prot-rows"></div>
+    <div class="prot-actions">
+      <button class="btn btn-pri" onclick="saveProtTasks()">💾 Сохранить поручения</button>
     </div>
-    <div class="tasks-title" style="font-size:12px;">Открытые поручения</div>
-    <div class="tasks-list" id="tasks-list"><div class="tasks-empty">Загрузка…</div></div>
+    <div class="prot-open-title">Открытые поручения</div>
+    <div class="prot-open" id="prot-open"><div class="tasks-empty">Загрузка…</div></div>
   </div>
 </div>
 
@@ -2178,23 +2171,58 @@ async function submitPwd(){
   }
 }
 
-// ─── ПОРУЧЕНИЯ К ПРОТОКОЛУ ────────────────────────────────────────
-var TASKS=[];
-function openTasksModal(){
+// ─── ПОРУЧЕНИЯ К ПРОТОКОЛУ (панель справа) ────────────────────────
+var TASKS=[], PROT_OPEN=false;
+function toggleProt(){ PROT_OPEN?closeProt():openProt(); }
+function openProt(){
   if(!IS_ADMIN){ toast('Только для администратора','err'); return; }
-  // Заполняем список подрядчиков
-  var sel=document.getElementById('task-org');
-  sel.innerHTML='<option value="">— выберите —</option>';
-  CONTRACTORS.forEach(function(c){ sel.innerHTML+='<option value="'+e(c)+'">'+e(c)+'</option>'; });
-  document.getElementById('task-text').value='';
-  document.getElementById('task-due').value='';
-  document.getElementById('tasks-overlay').classList.add('on');
+  closeAnalytics();
+  PROT_OPEN=true;
+  document.getElementById('prot-panel').classList.add('on');
+  document.getElementById('prot-btn').classList.add('btn-pri');
+  resetProtRows();
   loadTasks();
 }
-function closeTasksModal(){ document.getElementById('tasks-overlay').classList.remove('on'); }
+function closeProt(){
+  PROT_OPEN=false;
+  document.getElementById('prot-panel').classList.remove('on');
+  document.getElementById('prot-btn').classList.remove('btn-pri');
+}
+
+// Опции подрядчиков для <select>
+function protOrgOptions(){
+  return '<option value="">— подрядчик —</option>'+
+    CONTRACTORS.map(function(c){ return '<option value="'+e(c)+'">'+e(c)+'</option>'; }).join('');
+}
+// Одна пустая строка ввода поручения
+function makeProtRow(){
+  var row=document.createElement('div');
+  row.className='prot-row';
+  row.innerHTML=
+    '<textarea class="prot-text" placeholder="Текст поручения…" oninput="protRowInput(this)"></textarea>'+
+    '<div class="prot-side">'+
+      '<select class="prot-org">'+protOrgOptions()+'</select>'+
+      '<input type="date" class="prot-date">'+
+    '</div>';
+  return row;
+}
+function resetProtRows(){
+  var box=document.getElementById('prot-rows');
+  box.innerHTML='';
+  box.appendChild(makeProtRow());
+}
+// При вводе в последнюю строку — добавляем новую пустую ниже
+function protRowInput(el){
+  var box=document.getElementById('prot-rows');
+  var rows=box.querySelectorAll('.prot-row');
+  var last=rows[rows.length-1];
+  if(el.closest('.prot-row')===last && el.value.trim()!==''){
+    box.appendChild(makeProtRow());
+  }
+}
 
 async function loadTasks(){
-  var box=document.getElementById('tasks-list');
+  var box=document.getElementById('prot-open');
   box.innerHTML='<div class="tasks-empty">Загрузка…</div>';
   try{
     var r=await fetch(BASE+'?action=getTasks&t='+Date.now());
@@ -2206,7 +2234,7 @@ async function loadTasks(){
   }
 }
 function renderTasksList(){
-  var box=document.getElementById('tasks-list');
+  var box=document.getElementById('prot-open');
   if(!TASKS.length){ box.innerHTML='<div class="tasks-empty">Открытых поручений нет</div>'; return; }
   box.innerHTML=TASKS.map(function(t){
     return '<div class="task-item">'+
@@ -2219,23 +2247,33 @@ function renderTasksList(){
     '</div>';
   }).join('');
 }
-async function addTaskSubmit(){
-  var org=document.getElementById('task-org').value.trim();
-  var text=document.getElementById('task-text').value.trim();
-  var due=document.getElementById('task-due').value;
-  if(!org){ toast('Выберите подрядчика','err'); return; }
-  if(!text){ toast('Введите текст поручения','err'); return; }
+// Сохраняем все заполненные строки поручений
+async function saveProtTasks(){
+  var rows=document.querySelectorAll('#prot-rows .prot-row');
+  var toSave=[];
+  for(var i=0;i<rows.length;i++){
+    var text=rows[i].querySelector('.prot-text').value.trim();
+    var org=rows[i].querySelector('.prot-org').value.trim();
+    var due=rows[i].querySelector('.prot-date').value;
+    if(!text) continue;                 // пустые строки пропускаем
+    if(!org){ toast('Выберите подрядчика для поручения','err'); rows[i].querySelector('.prot-org').focus(); return; }
+    toSave.push({org:org, text:text, due:due?fmtDate(due):''});
+  }
+  if(!toSave.length){ toast('Нет заполненных поручений','inf'); return; }
+  setSt('spin','Сохранение поручений…');
   try{
-    var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
-      action:'addTask', pwd:ADMIN_PWD, org:org, text:text, due:due?fmtDate(due):'', author:AUTHOR
-    })});
-    var j=JSON.parse(await r.text());
-    if(j.error){ toast(j.error,'err'); return; }
-    document.getElementById('task-text').value='';
-    document.getElementById('task-due').value='';
-    toast('Поручение добавлено','ok');
+    for(var k=0;k<toSave.length;k++){
+      var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+        action:'addTask', pwd:ADMIN_PWD, org:toSave[k].org, text:toSave[k].text, due:toSave[k].due, author:AUTHOR
+      })});
+      var j=JSON.parse(await r.text());
+      if(j.error){ throw new Error(j.error); }
+    }
+    setSt('ok','Готово');
+    toast('Сохранено поручений: '+toSave.length,'ok');
+    resetProtRows();
     loadTasks();
-  }catch(ex){ toast('Ошибка сохранения','err'); }
+  }catch(ex){ setSt('err','Ошибка'); toast('Ошибка сохранения: '+ex.message,'err'); }
 }
 async function markTaskDone(id){
   try{
@@ -2287,6 +2325,7 @@ function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 var ANALYTICS_OPEN=false;
 function toggleAnalytics(){
   ANALYTICS_OPEN=!ANALYTICS_OPEN;
+  if(ANALYTICS_OPEN&&typeof closeProt==='function') closeProt();
   document.getElementById('analytics-panel').classList.toggle('on',ANALYTICS_OPEN);
   document.getElementById('an-btn').classList.toggle('btn-pri',ANALYTICS_OPEN);
   if(ANALYTICS_OPEN){
