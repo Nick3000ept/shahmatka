@@ -2175,7 +2175,9 @@ async function submitPwd(){
 var TASKS=[], PROT_OPEN=false;
 function toggleProt(){ PROT_OPEN?closeProt():openProt(); }
 function openProt(){
-  if(!IS_ADMIN){ toast('Только для администратора','err'); return; }
+  // Нужен сохранённый пароль админа для защищённых запросов.
+  // Если сессия «админ», но пароль не сохранён (старый вход) — просим ввести заново.
+  if(!ADMIN_PWD){ openPwdModal(openProt); return; }
   closeAnalytics();
   PROT_OPEN=true;
   document.getElementById('prot-panel').classList.add('on');
@@ -2249,6 +2251,7 @@ function renderTasksList(){
 }
 // Сохраняем все заполненные строки поручений
 async function saveProtTasks(){
+  if(!ADMIN_PWD){ openPwdModal(saveProtTasks); return; }
   var rows=document.querySelectorAll('#prot-rows .prot-row');
   var toSave=[];
   for(var i=0;i<rows.length;i++){
@@ -2276,6 +2279,7 @@ async function saveProtTasks(){
   }catch(ex){ setSt('err','Ошибка'); toast('Ошибка сохранения: '+ex.message,'err'); }
 }
 async function markTaskDone(id){
+  if(!ADMIN_PWD){ openPwdModal(function(){markTaskDone(id);}); return; }
   try{
     var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
       action:'updateTask', pwd:ADMIN_PWD, id:id, status:'выполнено'
