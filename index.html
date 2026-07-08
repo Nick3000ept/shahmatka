@@ -2554,28 +2554,15 @@ function serializeProto(){
   }).join('\n\n');
   return {title:title,num:num,date:date,sections:sections,text:text};
 }
-async function printProtocol(){
-  if(!ADMIN_PWD){ openPwdModal(printProtocol); return; }
+// Печать НЕ сохраняет протокол в таблицу — запись в лист «Протоколы»
+// происходит только при отправке (sendProtocol). Решение 2026-07-08.
+function printProtocol(){
   var s=serializeProto();
   if(!s.sections.length){ toast('Протокол пуст','inf'); return; }
-  setSt('spin','Сохранение протокола…');
-  try{
-    var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
-      action:'saveProtocol', pwd:ADMIN_PWD, num:s.num, date:s.date, title:s.title, content:s.text, author:AUTHOR
-    })});
-    var j=JSON.parse(await r.text());
-    if(j.error){ setSt('err','Ошибка'); toast(j.error,'err'); return; }
-    if(j.num){ s.num=j.num; document.getElementById('proto-num').textContent=j.num; }
-    setSt('ok','Протокол сохранён');
-  }catch(ex){
-    setSt('err','Ошибка');
-    toast('Не удалось сохранить протокол в таблицу — печать отменена, попробуйте ещё раз','err',6000);
-    return;
-  }
   // Собираем печатную версию и открываем диалог печати
   var pa=document.getElementById('print-area');
   var html='<div class="p-title">'+e(s.title)+'</div>'+
-    '<div class="p-meta">№ '+e(s.num)+' от '+e(s.date)+'</div>';
+    '<div class="p-meta">'+(s.num?'№ '+e(s.num)+' ':'')+'от '+e(s.date)+'</div>';
   s.sections.forEach(function(sec){
     html+='<div class="p-org">'+e(sec.org)+'</div>';
     sec.items.forEach(function(i){ html+='<div class="p-item">— '+e(i)+'</div>'; });
