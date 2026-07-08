@@ -25,6 +25,16 @@ const C = {
   // O+ не трогаем никогда
 };
 
+// Защита от formula injection: значение, начинающееся с =,+,-,@,
+// Google Sheets воспринял бы как формулу — экранируем апострофом.
+// Заодно ограничиваем длину пользовательского текста.
+function safeCell_(v) {
+  if (typeof v === 'number') return v; // числа (напр. %) не трогаем
+  var s = String(v || '').trim();
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return s.slice(0, 1000);
+}
+
 function jsonOut(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
@@ -53,15 +63,6 @@ function doGet(e) {
     }
 
     if (action === 'clearCache') { clearCache(); return jsonOut({ok: true}); }
-    if (action === 'debugDict') {
-      clearCache();
-      var dict = getWorkDict();
-      var keys = Object.keys(dict);
-      var q = p.q || '';
-      var match = q ? (dict[q] || null) : null;
-      var sample = keys.slice(0, 20);
-      return jsonOut({total: keys.length, query: q, match: match, sample: sample});
-    }
     if (action === 'getCheckLists') return jsonOut(getCheckLists());
     if (action === 'getStaffing')   return jsonOut(getStaffing());
     if (action === 'getTasks')      return jsonOut(getTasks(p.all === '1'));
@@ -136,12 +137,12 @@ function doPost(e) {
 
           // Меняем ТОЛЬКО пришедшие поля — остальные остаются как были
           var anyChange = false;
-          if (r.status  !== undefined) { allValues[idx][C.STATUS   - off] = r.status  || ''; anyChange = true; }
-          if (r.pct     !== undefined) { allValues[idx][C.PCT      - off] = r.pct     || ''; anyChange = true; }
-          if (r.comment !== undefined) { allValues[idx][C.COMMENT  - off] = r.comment || ''; anyChange = true; }
-          if (r.org     !== undefined) { allValues[idx][C.ORG      - off] = r.org     || ''; anyChange = true; }
-          if (r.dateEnd !== undefined) { allValues[idx][C.DATE_END - off] = r.dateEnd || ''; anyChange = true; }
-          if (r.author)                  allValues[idx][C.AUTHOR   - off] = r.author;
+          if (r.status  !== undefined) { allValues[idx][C.STATUS   - off] = safeCell_(r.status);  anyChange = true; }
+          if (r.pct     !== undefined) { allValues[idx][C.PCT      - off] = r.pct === '' || r.pct === undefined ? '' : safeCell_(r.pct); anyChange = true; }
+          if (r.comment !== undefined) { allValues[idx][C.COMMENT  - off] = safeCell_(r.comment); anyChange = true; }
+          if (r.org     !== undefined) { allValues[idx][C.ORG      - off] = safeCell_(r.org);     anyChange = true; }
+          if (r.dateEnd !== undefined) { allValues[idx][C.DATE_END - off] = safeCell_(r.dateEnd); anyChange = true; }
+          if (r.author)                  allValues[idx][C.AUTHOR   - off] = safeCell_(r.author);
           // DATE_CHG только если действительно что-то изменилось
           if (anyChange) allValues[idx][C.DATE_CHG - off] = nowStr;
           if (anyChange) changedIndices.push(idx);
@@ -282,10 +283,10 @@ function saveOneRow(data) {
     var rowId = String(ids[i][0]).trim();
     if (rowId && rowId === String(data.rowId)) { targetRowSheet = i + 2; break; }
   }
-  // Запасной вариант для синтетических ID (row_N)
+  // Запасной вариант для синтетических ID (row_N) — только в пределах данных (не заголовок, не за концом)
   if (targetRowSheet < 0 && String(data.rowId).startsWith('row_')) {
     var synRow = parseInt(String(data.rowId).replace('row_', ''));
-    if (!isNaN(synRow)) targetRowSheet = synRow;
+    if (!isNaN(synRow) && synRow >= 2 && synRow <= lastRow) targetRowSheet = synRow;
   }
   if (targetRowSheet < 0) throw new Error('Строка не найдена: ' + data.rowId);
 
@@ -298,12 +299,12 @@ function saveOneRow(data) {
 
   var off = EDIT_START; // 7 — смещение: индекс в rowValues = C.X - off
   var anyChange = false;
-  if (data.status  !== undefined) { rowValues[C.STATUS   - off] = data.status  || ''; anyChange = true; }
-  if (data.dateEnd !== undefined) { rowValues[C.DATE_END - off] = data.dateEnd || ''; anyChange = true; }
-  if (data.pct     !== undefined) { rowValues[C.PCT      - off] = data.pct     || ''; anyChange = true; }
-  if (data.org     !== undefined) { rowValues[C.ORG      - off] = data.org     || ''; anyChange = true; }
-  if (data.comment !== undefined) { rowValues[C.COMMENT  - off] = data.comment || ''; anyChange = true; }
-  if (data.author)                  rowValues[C.AUTHOR   - off] = data.author;
+  if (data.status  !== undefined) { rowValues[C.STATUS   - off] = safeCell_(data.status);  anyChange = true; }
+  if (data.dateEnd !== undefined) { rowValues[C.DATE_END - off] = safeCell_(data.dateEnd); anyChange = true; }
+  if (data.pct     !== undefined) { rowValues[C.PCT      - off] = data.pct === '' || data.pct === undefined ? '' : safeCell_(data.pct); anyChange = true; }
+  if (data.org     !== undefined) { rowValues[C.ORG      - off] = safeCell_(data.org);     anyChange = true; }
+  if (data.comment !== undefined) { rowValues[C.COMMENT  - off] = safeCell_(data.comment); anyChange = true; }
+  if (data.author)                  rowValues[C.AUTHOR   - off] = safeCell_(data.author);
   // DATE_CHG только если действительно что-то изменилось
   if (anyChange) rowValues[C.DATE_CHG - off] = nowStr;
   if (!anyChange) return; // нечего писать — выходим без записи в таблицу
@@ -453,7 +454,7 @@ function addTask(body) {
   var sheet = ensureTasksSheet_();
   var id = 't' + Date.now() + Math.floor(Math.random() * 1000);
   var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy');
-  sheet.appendRow([id, org, text, String(body.due || '').trim(), 'открыто', nowStr, String(body.author || '').trim()]);
+  sheet.appendRow([id, safeCell_(org), safeCell_(text), safeCell_(body.due), 'открыто', nowStr, safeCell_(body.author)]);
   SpreadsheetApp.flush();
   return {ok: true, id: id};
 }
@@ -468,10 +469,10 @@ function updateTask(body) {
   for (var i = 0; i < ids.length; i++) {
     if (String(ids[i][0]).trim() === id) {
       var r = i + 2;
-      if (body.status !== undefined) sheet.getRange(r, 5).setValue(String(body.status));
-      if (body.org    !== undefined) sheet.getRange(r, 2).setValue(String(body.org));
-      if (body.text   !== undefined) sheet.getRange(r, 3).setValue(String(body.text));
-      if (body.due    !== undefined) sheet.getRange(r, 4).setValue(String(body.due));
+      if (body.status !== undefined) sheet.getRange(r, 5).setValue(safeCell_(body.status));
+      if (body.org    !== undefined) sheet.getRange(r, 2).setValue(safeCell_(body.org));
+      if (body.text   !== undefined) sheet.getRange(r, 3).setValue(safeCell_(body.text));
+      if (body.due    !== undefined) sheet.getRange(r, 4).setValue(safeCell_(body.due));
       SpreadsheetApp.flush();
       return {ok: true};
     }

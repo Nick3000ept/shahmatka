@@ -871,7 +871,7 @@ async function loadContractors(){
   if(!BASE) return;
   // Проверяем кэш
   var cached=localStorage.getItem('sb3_contractors');
-  if(cached){try{CONTRACTORS=JSON.parse(cached);renderContractorChips();}catch(ex){}}
+  if(cached){try{CONTRACTORS=JSON.parse(cached);renderContractorSelect('');}catch(ex){}}
   try{
     var r=await fetch(BASE+'?action=getContractors&t='+Date.now());
     var j=JSON.parse(await r.text());
@@ -1532,7 +1532,7 @@ function render(){
         var vol=(row.volume||'—')+(row.unit?' '+row.unit:'');
         cellContent='<div class="c-date" style="font-size:10px;text-align:center;width:100%;">'+e(vol)+'</div>';
       } else if(SHOW_SP){
-        cellContent='<div class="c-date sp">'+(row.org||mod&&mod.org?dl:'<span style="color:var(--ink3)">—</span>')+'</div>';
+        cellContent='<div class="c-date sp">'+(row.org||mod&&mod.org?e(dl):'<span style="color:var(--ink3)">—</span>')+'</div>';
       } else if(showFactOnly){
         // Нет базового/текущего — только фактическое
         cellContent='<div class="c-date'+(factDl?'':' empty')+(isOverdue?' overdue':'')+'">'+(factDl||'—')+'</div>';
@@ -1730,7 +1730,7 @@ function resetMsDraft(){
   var sv=document.getElementById('ms-pct-val'); if(sv) sv.textContent='0%';
   var cb=document.getElementById('ms-pct-reset'); if(cb) cb.checked=false;
   var mco=document.getElementById('ms-contractor'); if(mco) mco.value='';
-  ['msc-done','msc-started','msc-remarks','msc-accepted','msc-empty'].forEach(id=>{
+  ['msc-done','msc-started','msc-front','msc-onsite','msc-remarks','msc-empty'].forEach(id=>{
     var el=document.getElementById(id); if(el) el.classList.remove('act');
   });
   var pr=document.getElementById('ms-preview'); if(pr) pr.innerHTML='';
@@ -1969,8 +1969,8 @@ function selSt(s){
 }
 function selStMixed(){
   CUR_ST='s-empty';
-  var ids=['sc-done','sc-started','sc-accepted','sc-remarks','sc-empty'];
-  ids.forEach(id=>{var btn=document.getElementById(id); btn.className='sc mixed'+(id==='sc-empty'?' full':'');});
+  var ids=['sc-done','sc-started','sc-front','sc-onsite','sc-remarks','sc-empty'];
+  ids.forEach(id=>{var btn=document.getElementById(id); if(btn) btn.className='sc mixed'+(id==='sc-empty'?' full':'');});
 }
 
 function updPct(v){
