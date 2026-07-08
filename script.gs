@@ -6,6 +6,7 @@ const SHEET_NAME = 'СБ3_ОБЩАЯ';
 const ADMIN_PASSWORD = 'adminACCB3';
 const SK_PASSWORD    = 'priemkaCB3';
 const TASKS_SHEET    = 'Поручения';
+const PROTOCOLS_SHEET = 'Протоколы';
 
 const C = {
   ROW_ID    : 1,
@@ -177,6 +178,11 @@ function doPost(e) {
     if (body.action === 'updateTask') {
       if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
       return jsonOut(updateTask(body));
+    }
+
+    if (body.action === 'saveProtocol') {
+      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      return jsonOut(saveProtocol(body));
     }
 
     return jsonOut({error: 'Unknown action: ' + body.action});
@@ -478,6 +484,35 @@ function updateTask(body) {
     }
   }
   return {error: 'Поручение не найдено'};
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ПРОТОКОЛЫ (лист «Протоколы») — история сформированных протоколов
+// Столбцы: A=№ | B=Дата | C=Автор | D=Содержимое (текст)
+// ═══════════════════════════════════════════════════════════════════
+function ensureProtocolsSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(PROTOCOLS_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(PROTOCOLS_SHEET);
+    sheet.appendRow(['№', 'Дата', 'Автор', 'Содержимое']);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function saveProtocol(body) {
+  var sheet = ensureProtocolsSheet_();
+  var num = String(body.num || '').trim();
+  if (!num) num = String(sheet.getLastRow()); // строка 1 — шапка, значит следующий номер = кол-во протоколов + 1
+  // Содержимое протокола длинное — обычный safeCell_ (лимит 1000) не подходит,
+  // экранируем формулы вручную и режем по лимиту ячейки Sheets
+  var content = String(body.content || '');
+  if (/^[=+\-@]/.test(content)) content = "'" + content;
+  content = content.slice(0, 45000);
+  sheet.appendRow([safeCell_(num), safeCell_(body.date), safeCell_(body.author), content]);
+  SpreadsheetApp.flush();
+  return {ok: true, num: num};
 }
 
 function clearCache() {

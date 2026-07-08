@@ -140,6 +140,31 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .tasks-done-list{display:flex;flex-direction:column;gap:6px;overflow:hidden;}
 .tasks-done-list.collapsed{display:none;}
 .task-item.done{opacity:.55;}
+/* ── Предпросмотр протокола ── */
+.proto-overlay{display:none;position:fixed;inset:0;background:rgba(15,18,25,.45);z-index:600;justify-content:center;overflow-y:auto;padding:24px 0;}
+.proto-overlay.on{display:flex;}
+.proto-page{background:#fff;width:min(780px,94vw);height:fit-content;border-radius:10px;box-shadow:0 12px 48px rgba(0,0,0,.25);padding:26px 36px 34px;display:flex;flex-direction:column;gap:12px;}
+.proto-toolbar{display:flex;justify-content:flex-end;gap:8px;}
+.proto-title{font-size:16px;font-weight:700;color:#111;text-align:center;outline:none;}
+.proto-meta{font-size:12px;color:#333;text-align:center;}
+.proto-meta span{outline:none;padding:0 2px;min-width:20px;display:inline-block;}
+#proto-doc [contenteditable]:hover{background:#f5f8ff;border-radius:3px;}
+#proto-doc [contenteditable]:focus{background:#eef4ff;border-radius:3px;}
+.proto-org{font-size:13px;font-weight:700;color:#111;margin-top:14px;border-bottom:1px solid #bbb;padding-bottom:3px;}
+.proto-item{display:flex;gap:6px;align-items:flex-start;padding:3px 0;font-size:12px;color:#111;}
+.proto-item .pi-text{flex:1;outline:none;line-height:1.5;}
+.pi-del{border:none;background:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 4px;flex-shrink:0;opacity:.4;}
+.proto-item:hover .pi-del{opacity:1;}
+.pi-add{align-self:flex-start;font-size:10px;padding:2px 8px;margin-top:3px;}
+#print-area{display:none;}
+@media print{
+  body.printing > *{display:none!important;}
+  body.printing #print-area{display:block!important;}
+  #print-area .p-title{font-size:18px;font-weight:700;text-align:center;margin-bottom:4px;}
+  #print-area .p-meta{text-align:center;font-size:12px;margin-bottom:18px;}
+  #print-area .p-org{font-size:13px;font-weight:700;margin:16px 0 5px;border-bottom:1px solid #000;padding-bottom:2px;}
+  #print-area .p-item{font-size:12px;margin:4px 0;line-height:1.5;}
+}
 
 /* ── CHECKLIST BADGE & POPUP ── */
 .cl-badge{position:absolute;top:2px;right:2px;background:var(--acc);color:#fff;border-radius:8px;font-size:9px;font-weight:700;padding:0 4px;line-height:14px;z-index:2;font-family:var(--mono);pointer-events:none;}
@@ -556,8 +581,8 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     Просрочено
   </label>
   <label class="chk-lbl">
-    <input type="checkbox" id="fplan30" onchange="FPLAN30=this.checked;render();">
-    План на 30 дней
+    <input type="checkbox" id="fprotocol" onchange="FPROTOCOL=this.checked;render();">
+    Протокол
   </label>
   <div class="fsep"></div>
   <span class="fl" style="font-size:11px;">Пресеты:</span>
@@ -710,12 +735,28 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <div class="prot-body">
     <div class="prot-rows" id="prot-rows"></div>
     <div class="prot-actions">
+      <button class="btn" onclick="openProtoPreview()">📄 Сформировать протокол</button>
       <button class="btn btn-pri" onclick="saveProtTasks()">💾 Сохранить поручения</button>
     </div>
     <div class="prot-open-title">Открытые поручения</div>
     <div class="prot-open" id="prot-open"><div class="tasks-empty">Загрузка…</div></div>
     <div class="prot-open-title">Из графика — план на 7 дней</div>
     <div class="prot-auto" id="prot-auto"></div>
+  </div>
+</div>
+
+<!-- ПРЕДПРОСМОТР ПРОТОКОЛА (редактируемый) -->
+<div class="proto-overlay" id="proto-overlay">
+  <div class="proto-page">
+    <div class="proto-toolbar">
+      <button class="btn" onclick="closeProtoPreview()">✕ Закрыть</button>
+      <button class="btn btn-pri" onclick="printProtocol()">🖨 Печать / PDF</button>
+    </div>
+    <div id="proto-doc">
+      <div class="proto-title" contenteditable="true" id="proto-title">Протокол совещания по строительству СБ3</div>
+      <div class="proto-meta">№ <span id="proto-num" contenteditable="true"></span> от <span id="proto-date" contenteditable="true"></span></div>
+      <div id="proto-secs"></div>
+    </div>
   </div>
 </div>
 
@@ -768,7 +809,7 @@ var CELL_MAP = new Map();    // rowId → td element, перестраивает
 var FLOOR_ROW_MAP = new Map(); // floor → [rowId], перестраивается в render()
 var ROWS_MAP = new Map();    // rowId → row object, перестраивается при loadData()
 
-var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, SHOW_CL=false, SHOW_EMPTY=false;
+var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, FPROTOCOL=false, SHOW_CL=false, SHOW_EMPTY=false;
 var CHECK_LISTS=[], CL_MAP={}, STAFFING_DATA=[];
 var WORKS=[];
 
@@ -1300,6 +1341,16 @@ function render(){
       var _done=_s==='s-done';
       var ok=(FOVERDUE&&dCur<_todayMs&&!_done)||(FPLAN7&&dCur<=_now+7*24*3600*1000)||(FPLAN30&&dCur<=_now+30*24*3600*1000);
       if(!ok) return false;
+    }
+    // Чекбокс «Протокол» — те же правила, что и авто-блок протокола:
+    // ручная dateEnd в ближайшие 7 дней, статус не «окончены»/«на площадке»
+    if(FPROTOCOL){
+      if(!r.org||!r.dateEnd) return false;
+      var _mp=MOD[r.rowId];
+      var _sp=_mp&&_mp.status!==undefined?_mp.status:(S2CSS[r.status||'']||'s-empty');
+      if(_sp==='s-done'||_sp==='s-onsite') return false;
+      var _dEnd=parseDateMs(fmtDate(r.dateEnd));
+      if(!_dEnd||_dEnd<TODAY_MS||_dEnd>TODAY_MS+7*24*3600*1000) return false;
     }
     return true;
   });
@@ -2372,6 +2423,106 @@ function renderAutoTasks(){
   box.innerHTML=html;
 }
 
+// ── Предпросмотр протокола (редактируемый) ────────────────────────
+// Состав: план на 7 дней из графика + открытые ручные поручения, по подрядчикам.
+// Правки живут только в предпросмотре; при печати текст сохраняется в лист «Протоколы».
+function protoItemHtml(text){
+  return '<div class="proto-item"><span class="pi-text" contenteditable="true">'+e(text)+'</span>'+
+    '<button class="pi-del" title="Убрать строку" onclick="protoDelItem(this)">✕</button></div>';
+}
+function openProtoPreview(){
+  if(!ADMIN_PWD){ openPwdModal(openProtoPreview); return; }
+  var byOrg=collectAutoTasks();
+  var openTasks=TASKS.filter(function(t){return t.status!=='выполнено';});
+  // Объединяем подрядчиков из графика и из ручных поручений
+  var orgSet={};
+  Object.keys(byOrg).forEach(function(o){orgSet[o]=1;});
+  openTasks.forEach(function(t){if(t.org)orgSet[t.org]=1;});
+  var orgs=Object.keys(orgSet).sort();
+  if(!orgs.length){ toast('Нет данных для протокола','inf'); return; }
+  var html='';
+  orgs.forEach(function(org){
+    html+='<div class="proto-sec"><div class="proto-org" contenteditable="true">'+e(org)+'</div>';
+    if(byOrg[org]){
+      Object.values(byOrg[org]).sort(function(a,b){return a.dueMs-b.dueMs;}).forEach(function(it){
+        var authors=Object.keys(it.authors);
+        html+=protoItemHtml(it.work+', '+it.corpus+': эт. '+floorsCompact(it.floors)
+          +' — срок '+it.due+(authors.length?' (поставил: '+authors.join(', ')+')':''));
+      });
+    }
+    openTasks.filter(function(t){return t.org===org;}).forEach(function(t){
+      html+=protoItemHtml(t.text+(t.due?' — срок '+t.due:''));
+    });
+    html+='<button class="btn pi-add" onclick="protoAddItem(this)">+ строка</button></div>';
+  });
+  document.getElementById('proto-secs').innerHTML=html;
+  document.getElementById('proto-num').textContent='';
+  var d=new Date();
+  document.getElementById('proto-date').textContent=
+    (d.getDate()<10?'0':'')+d.getDate()+'.'+(d.getMonth()<9?'0':'')+(d.getMonth()+1)+'.'+d.getFullYear();
+  document.getElementById('proto-overlay').classList.add('on');
+}
+function closeProtoPreview(){ document.getElementById('proto-overlay').classList.remove('on'); }
+function protoDelItem(btn){ btn.closest('.proto-item').remove(); }
+function protoAddItem(btn){
+  var div=document.createElement('div');
+  div.innerHTML=protoItemHtml('');
+  var item=div.firstChild;
+  btn.parentNode.insertBefore(item,btn);
+  item.querySelector('.pi-text').focus();
+}
+function serializeProto(){
+  var title=document.getElementById('proto-title').textContent.trim();
+  var num=document.getElementById('proto-num').textContent.trim();
+  var date=document.getElementById('proto-date').textContent.trim();
+  var sections=[];
+  document.querySelectorAll('#proto-secs .proto-sec').forEach(function(sec){
+    var org=sec.querySelector('.proto-org').textContent.trim();
+    var items=[];
+    sec.querySelectorAll('.pi-text').forEach(function(el){
+      var t=el.textContent.trim();
+      if(t) items.push(t);
+    });
+    if(org&&items.length) sections.push({org:org,items:items});
+  });
+  var text=sections.map(function(s){
+    return s.org+'\n'+s.items.map(function(i){return '— '+i;}).join('\n');
+  }).join('\n\n');
+  return {title:title,num:num,date:date,sections:sections,text:text};
+}
+async function printProtocol(){
+  if(!ADMIN_PWD){ openPwdModal(printProtocol); return; }
+  var s=serializeProto();
+  if(!s.sections.length){ toast('Протокол пуст','inf'); return; }
+  setSt('spin','Сохранение протокола…');
+  try{
+    var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+      action:'saveProtocol', pwd:ADMIN_PWD, num:s.num, date:s.date, title:s.title, content:s.text, author:AUTHOR
+    })});
+    var j=JSON.parse(await r.text());
+    if(j.error){ setSt('err','Ошибка'); toast(j.error,'err'); return; }
+    if(j.num){ s.num=j.num; document.getElementById('proto-num').textContent=j.num; }
+    setSt('ok','Протокол сохранён');
+  }catch(ex){
+    setSt('err','Ошибка');
+    toast('Не удалось сохранить протокол в таблицу — печать отменена, попробуйте ещё раз','err',6000);
+    return;
+  }
+  // Собираем печатную версию и открываем диалог печати
+  var pa=document.getElementById('print-area');
+  var html='<div class="p-title">'+e(s.title)+'</div>'+
+    '<div class="p-meta">№ '+e(s.num)+' от '+e(s.date)+'</div>';
+  s.sections.forEach(function(sec){
+    html+='<div class="p-org">'+e(sec.org)+'</div>';
+    sec.items.forEach(function(i){ html+='<div class="p-item">— '+e(i)+'</div>'; });
+  });
+  pa.innerHTML=html;
+  document.body.classList.add('printing');
+  var done=function(){ document.body.classList.remove('printing'); window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done);
+  setTimeout(function(){ window.print(); setTimeout(done,500); },50);
+}
+
 async function markTaskDone(id){
   if(!ADMIN_PWD){ openPwdModal(function(){markTaskDone(id);}); return; }
   try{
@@ -2750,5 +2901,6 @@ function clOpenLink(url){if(url) window.open(url,'_blank');}
 </div>
 
 </div>
+<div id="print-area"></div>
 </body>
 </html>
