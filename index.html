@@ -714,7 +714,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     </div>
     <div class="prot-open-title">Открытые поручения</div>
     <div class="prot-open" id="prot-open"><div class="tasks-empty">Загрузка…</div></div>
-    <div class="prot-open-title">Из графика — просрочено и план на 7 дней</div>
+    <div class="prot-open-title">Из графика — план на 7 дней</div>
     <div class="prot-auto" id="prot-auto"></div>
   </div>
 </div>
@@ -2331,7 +2331,10 @@ function floorsCompact(floors){
   return parts.concat(rest).join(', ');
 }
 function collectAutoTasks(){
-  // Собираем из ROWS: {org: {key: {work,corpus,dueMs,due,over,floors[]}}}
+  // Только план на 7 дней (просрочки убраны по решению 2026-07-08).
+  // Дата — только ручная dateEnd (столбец I).
+  // Исключены статусы «СМР окончены» и «На площадке».
+  // Группировка: подрядчик → работа+корпус+срок, этажи списком, автор срока.
   var weekEnd=TODAY_MS+7*24*3600*1000;
   var byOrg={};
   ROWS.forEach(function(r){
@@ -2339,13 +2342,12 @@ function collectAutoTasks(){
     var st=S2CSS[r.status||'']||'s-empty';
     if(st==='s-done'||st==='s-onsite') return;
     var ms=parseDateMs(fmtDate(r.dateEnd));
-    if(!ms) return;
-    var over=ms<TODAY_MS;
-    if(!over&&ms>weekEnd) return; // дальше горизонта — не берём
+    if(!ms||ms<TODAY_MS||ms>weekEnd) return; // только вперёд, в горизонте 7 дней
     var key=r.work+'|'+r.corpus+'|'+ms;
     if(!byOrg[r.org]) byOrg[r.org]={};
-    if(!byOrg[r.org][key]) byOrg[r.org][key]={work:r.work,corpus:r.corpus,dueMs:ms,due:fmtDate(r.dateEnd),over:over,floors:[]};
+    if(!byOrg[r.org][key]) byOrg[r.org][key]={work:r.work,corpus:r.corpus,dueMs:ms,due:fmtDate(r.dateEnd),floors:[],authors:{}};
     byOrg[r.org][key].floors.push(r.floor);
+    if(r.author) byOrg[r.org][key].authors[r.author]=1; // собираем уникальных авторов
   });
   return byOrg;
 }
@@ -2353,17 +2355,18 @@ function renderAutoTasks(){
   var box=document.getElementById('prot-auto');
   var byOrg=collectAutoTasks();
   var orgs=Object.keys(byOrg).sort();
-  if(!orgs.length){ box.innerHTML='<div class="tasks-empty">Нет работ с ручной датой окончания в просрочке или на 7 дней</div>'; return; }
+  if(!orgs.length){ box.innerHTML='<div class="tasks-empty">Нет работ с ручной датой окончания на ближайшие 7 дней</div>'; return; }
   var html='';
   orgs.forEach(function(org){
-    var items=Object.values(byOrg[org]);
-    // Сначала просроченные (старые выше), потом план по возрастанию срока
-    items.sort(function(a,b){ return (a.over===b.over)?a.dueMs-b.dueMs:(a.over?-1:1); });
+    var items=Object.values(byOrg[org]).sort(function(a,b){return a.dueMs-b.dueMs;});
     html+='<div class="pa-org">'+e(org)+'</div>';
     items.forEach(function(it){
-      html+='<div class="pa-item '+(it.over?'pa-over':'pa-plan')+'">'
+      var authors=Object.keys(it.authors);
+      html+='<div class="pa-item pa-plan">'
         +e(it.work)+', '+e(it.corpus)+': эт. '+e(floorsCompact(it.floors))
-        +' — <span class="pa-due">'+(it.over?'просрочено, срок был ':'срок ')+e(it.due)+'</span></div>';
+        +' — <span class="pa-due">срок '+e(it.due)+'</span>'
+        +(authors.length?' <span style="font-size:10px;color:var(--ink3);">· поставил: '+e(authors.join(', '))+'</span>':'')
+        +'</div>';
     });
   });
   box.innerHTML=html;
