@@ -773,7 +773,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <div class="proto-title" style="font-size:14px;">Получатели протокола</div>
     <div style="font-size:11px;color:var(--ink3);text-align:center;">Снимите галочку, чтобы не отправлять. Отправитель — kuzkin@acons.group, каждому отдельное письмо с PDF.</div>
     <div id="send-list" style="display:flex;flex-direction:column;gap:6px;"></div>
-    <div style="display:flex;gap:6px;">
+    <div style="display:flex;gap:6px;" id="send-manual-row">
       <input type="email" id="send-manual" placeholder="Добавить адрес вручную…" style="flex:1;padding:7px 10px;border:1px solid var(--brd2);border-radius:var(--r);font-size:12px;outline:none;color:var(--ink);" onkeydown="if(event.key==='Enter')sendAddManual()">
       <button class="btn" onclick="sendAddManual()">+ Добавить</button>
     </div>
@@ -2604,6 +2604,9 @@ async function openSendModal(){
   });
   if(!rows){ toast('Нет получателей','inf'); return; }
   document.getElementById('send-list').innerHTML=rows;
+  // Сброс после возможного прошлого отчёта об отправке
+  document.getElementById('send-btn').style.display='';
+  document.getElementById('send-manual-row').style.display='';
   document.getElementById('send-overlay').classList.add('on');
 }
 function closeSendModal(){ document.getElementById('send-overlay').classList.remove('on'); }
@@ -2646,14 +2649,22 @@ async function sendProtocolMail(){
     if(j.error) throw new Error(j.error);
     if(j.num) document.getElementById('proto-num').textContent=j.num;
     var okN=(j.sent||[]).length;
-    if(j.errors&&j.errors.length){
-      setSt('err','Отправлено частично');
-      toast('Отправлено: '+okN+'. Ошибки: '+j.errors.join('; '),'err',8000);
-    }else{
-      setSt('ok','Протокол отправлен');
-      toast('Отправлено писем: '+okN,'ok');
-      closeSendModal();
+    // Отчёт об отправке прямо в окне: кому ушло, что не ушло
+    var rep='';
+    if(okN){
+      rep+='<div style="font-size:13px;font-weight:700;color:var(--green);">✅ Письма отправлены ('+okN+')</div>';
+      (j.sent||[]).forEach(function(em){ rep+='<div class="send-row">📧 '+e(em)+'</div>'; });
     }
+    if(j.errors&&j.errors.length){
+      rep+='<div style="font-size:12px;font-weight:700;color:var(--red);margin-top:6px;">Не отправлено:</div>';
+      j.errors.forEach(function(er){ rep+='<div class="send-row" style="border-color:var(--red);">'+e(er)+'</div>'; });
+    }
+    rep+='<div style="font-size:10px;color:var(--ink3);">Протокол № '+e(j.num||'')+' записан в лист «Протоколы» с отметкой об отправке.</div>';
+    document.getElementById('send-list').innerHTML=rep;
+    document.getElementById('send-btn').style.display='none';
+    document.getElementById('send-manual-row').style.display='none';
+    if(j.errors&&j.errors.length){ setSt('err','Отправлено частично'); }
+    else { setSt('ok','Протокол отправлен'); }
   }catch(ex){
     setSt('err','Ошибка');
     toast('Ошибка отправки: '+ex.message,'err',6000);
