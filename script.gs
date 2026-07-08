@@ -47,7 +47,7 @@ function doGet(e) {
     var p = (e && e.parameter) ? e.parameter : {};
     var action = p.action || '';
 
-    if (action === 'getRows') return jsonOut(getRows(p.corpus || ''));
+    if (action === 'getRows') return jsonOut(getRows(p.corpus || '', p.fmt === '2'));
     if (action === 'ping')    return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
 
     if (action === 'getContractors') {
@@ -99,6 +99,12 @@ function doPost(e) {
       return jsonOut({ok: true});
     }
 
+    // Пакетное сохранение малых объёмов: один запрос вместо параллельных saveRow.
+    // Под LockService — исключает толкучку одновременных обращений к таблице.
+    if (body.action === 'saveRows') {
+      return jsonOut(saveRowsBatch(body.rows || []));
+    }
+
     if (body.action === 'saveAll') {
       var rows = body.rows || [];
       var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -117,6 +123,9 @@ function doPost(e) {
         // Читаем rowId (столбец A) отдельно — для построения карты
         var idValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
 
+        // B..F одним чтением — для сверки отпечатка строки (защита от сдвижки)
+        var chkValues = sheet.getRange(2, 2, lastRow - 1, 5).getValues();
+
         // Читаем только G-N (7 столбцов: org/status/dateEnd/dateRecv/pct/comment/dateChg/author)
         // A-F не трогаем — там dropdown-валидация, запись вызовет ошибку
         var EDIT_START = 7; // столбец G
@@ -133,9 +142,21 @@ function doPost(e) {
         // Смещение: индекс в allValues = C.X - EDIT_START
         var off = EDIT_START; // 7
         var changedIndices = [];
+        var mismatched = [];
         rows.forEach(function(r) {
           var idx = rowMap[String(r.rowId)];
           if (idx === undefined) return;
+
+          // Защита от сдвижки: отпечаток строки (корпус/этаж/работа) должен совпасть
+          if (r.chk) {
+            var bf = chkValues[idx];
+            if (String(bf[0]).trim() !== String(r.chk.c === undefined ? '' : r.chk.c).trim() ||
+                String(bf[1]).trim() !== String(r.chk.f === undefined ? '' : r.chk.f).trim() ||
+                String(bf[4]).trim() !== String(r.chk.w === undefined ? '' : r.chk.w).trim()) {
+              mismatched.push(String(r.rowId));
+              return;
+            }
+          }
 
           // Меняем ТОЛЬКО пришедшие поля — остальные остаются как были
           var anyChange = false;
@@ -168,7 +189,7 @@ function doPost(e) {
       } finally {
         lock.releaseLock();
       }
-      return jsonOut({ok: true, saved: changedIndices.length, requested: rows.length});
+      return jsonOut({ok: true, saved: changedIndices.length, requested: rows.length, mismatched: mismatched});
     }
 
     if (body.action === 'addTask') {
@@ -231,7 +252,12 @@ function getWorkDict() {
   return dict;
 }
 
-function getRows(filterCorpus) {
+// Порядок столбцов компактного формата (fmt=2) — синхронизирован с ROW_COLS во фронтенде
+var ROW_COLS = ['rowId','corpus','floor','work','extra1','org','status','dateEnd','pct','comment',
+                'dateChg','author','place','lvl1','lvl2','kp','factNum','baseDate','currentDate',
+                'volume','unit','idFact'];
+
+function getRows(filterCorpus, compact) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEET_NAME) || findSheet(ss);
   if (!sheet) return {error: 'Лист не найден'};
@@ -278,6 +304,14 @@ function getRows(filterCorpus) {
     var cc = a.corpus < b.corpus ? -1 : a.corpus > b.corpus ? 1 : 0;
     return cc !== 0 ? cc : (b.floor || 0) - (a.floor || 0);
   });
+  // Компактный формат fmt=2: заголовок один раз + строки-массивы.
+  // Экономит ~половину объёма (имена полей не повторяются 24 000 раз).
+  if (compact) {
+    var data = rows.map(function(r) {
+      return ROW_COLS.map(function(k) { return r[k]; });
+    });
+    return {cols: ROW_COLS, data: data};
+  }
   return {rows: rows};
 }
 
@@ -328,6 +362,79 @@ function saveOneRow(data) {
     sheet.getRange(targetRowSheet, 8, 1, 7).setValues([rowValues.slice(1)]);
   }
   SpreadsheetApp.flush();
+}
+
+// Пакетное сохранение (≤50 строк): один проход по ID, адресные чтение/запись G-N
+// только изменённых строк, всё под ScriptLock
+function saveRowsBatch(rows) {
+  if (!rows.length) return {ok: true, saved: 0, requested: 0};
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = findSheet(ss);
+  if (!sheet) return {error: 'Лист не найден'};
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  var saved = 0, mismatched = [];
+  try {
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return {ok: true, saved: 0, requested: rows.length};
+
+    // Карта rowId → строка листа (читаем столбец A один раз на весь пакет)
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    var rowMap = {};
+    ids.forEach(function(r, i) {
+      var id = String(r[0]).trim();
+      if (id) rowMap[id] = i + 2;
+    });
+
+    var EDIT_START = 7, EDIT_COLS = 8, off = 7;
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy');
+
+    rows.forEach(function(data) {
+      var sheetRow = rowMap[String(data.rowId)];
+      if (!sheetRow && String(data.rowId).startsWith('row_')) {
+        var synRow = parseInt(String(data.rowId).replace('row_', ''));
+        if (!isNaN(synRow) && synRow >= 2 && synRow <= lastRow) sheetRow = synRow;
+      }
+      if (!sheetRow) return;
+
+      // Защита от сдвижки: сверяем отпечаток строки (корпус B / этаж C / работа F)
+      // с тем, что видел фронтенд. Не совпало → строку НЕ трогаем.
+      if (data.chk) {
+        var bf = sheet.getRange(sheetRow, 2, 1, 5).getValues()[0]; // B..F (только чтение)
+        if (String(bf[0]).trim() !== String(data.chk.c === undefined ? '' : data.chk.c).trim() ||
+            String(bf[1]).trim() !== String(data.chk.f === undefined ? '' : data.chk.f).trim() ||
+            String(bf[4]).trim() !== String(data.chk.w === undefined ? '' : data.chk.w).trim()) {
+          mismatched.push(String(data.rowId));
+          return;
+        }
+      }
+
+      var rowValues = sheet.getRange(sheetRow, EDIT_START, 1, EDIT_COLS).getValues()[0];
+      var anyChange = false;
+      if (data.status  !== undefined) { rowValues[C.STATUS   - off] = safeCell_(data.status);  anyChange = true; }
+      if (data.dateEnd !== undefined) { rowValues[C.DATE_END - off] = safeCell_(data.dateEnd); anyChange = true; }
+      if (data.pct     !== undefined) { rowValues[C.PCT      - off] = data.pct === '' || data.pct === undefined ? '' : safeCell_(data.pct); anyChange = true; }
+      if (data.org     !== undefined) { rowValues[C.ORG      - off] = safeCell_(data.org);     anyChange = true; }
+      if (data.comment !== undefined) { rowValues[C.COMMENT  - off] = safeCell_(data.comment); anyChange = true; }
+      if (data.author)                  rowValues[C.AUTHOR   - off] = safeCell_(data.author);
+      if (!anyChange) return;
+      rowValues[C.DATE_CHG - off] = nowStr;
+
+      // G (org) может иметь dropdown-валидацию: при ошибке fallback на H-N
+      try {
+        sheet.getRange(sheetRow, EDIT_START, 1, EDIT_COLS).setValues([rowValues]);
+      } catch (e) {
+        sheet.getRange(sheetRow, 8, 1, 7).setValues([rowValues.slice(1)]);
+      }
+      saved++;
+    });
+    SpreadsheetApp.flush();
+    clearCache();
+  } finally {
+    lock.releaseLock();
+  }
+  return {ok: true, saved: saved, requested: rows.length, mismatched: mismatched};
 }
 
 function findSheet(ss) {
