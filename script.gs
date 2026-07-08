@@ -67,6 +67,7 @@ function doGet(e) {
     if (action === 'getCheckLists') return jsonOut(getCheckLists());
     if (action === 'getStaffing')   return jsonOut(getStaffing());
     if (action === 'getTasks')      return jsonOut(getTasks(p.all === '1'));
+    if (action === 'getContractorEmails') return jsonOut(getContractorEmails());
 
 
     if (action === 'checkPassword') {
@@ -183,6 +184,11 @@ function doPost(e) {
     if (body.action === 'saveProtocol') {
       if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
       return jsonOut(saveProtocol(body));
+    }
+
+    if (body.action === 'sendProtocol') {
+      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      return jsonOut(sendProtocol(body));
     }
 
     return jsonOut({error: 'Unknown action: ' + body.action});
@@ -495,10 +501,109 @@ function ensureProtocolsSheet_() {
   var sheet = ss.getSheetByName(PROTOCOLS_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(PROTOCOLS_SHEET);
-    sheet.appendRow(['№', 'Дата', 'Автор', 'Содержимое']);
+    sheet.appendRow(['№', 'Дата', 'Автор', 'Содержимое', 'Отправлено']);
     sheet.setFrozenRows(1);
   }
+  if (String(sheet.getRange(1, 5).getValue()) === '') sheet.getRange(1, 5).setValue('Отправлено');
   return sheet;
+}
+
+// Подрядчики с почтой: лист «Подрядчики», A=название, E=email
+function getContractorEmails() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Подрядчики');
+  if (!sheet) return {items: []};
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {items: []};
+  var vals = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+  var items = [], seen = {};
+  vals.forEach(function(r) {
+    var name = String(r[0]).trim();
+    if (!name || seen[name]) return;
+    seen[name] = 1;
+    items.push({name: name, email: String(r[4]).trim()});
+  });
+  return {items: items};
+}
+
+// Разовый тест авторизации почты: запустить в редакторе GAS → придёт письмо самому себе
+function testMailAuth() {
+  MailApp.sendEmail(Session.getEffectiveUser().getEmail(), 'Тест почты СБ3', 'Авторизация MailApp работает.');
+}
+
+function escHtml_(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Рассылка протокола: сохраняет/находит строку в «Протоколы», строит PDF,
+// шлёт каждому получателю отдельное письмо через MailApp (отправитель — аккаунт GAS)
+function sendProtocol(body) {
+  var recipients = body.recipients || [];
+  if (!recipients.length) return {error: 'Нет получателей'};
+  var num     = String(body.num || '').trim();
+  var date    = String(body.date || '').trim();
+  var title   = String(body.title || 'Протокол').trim();
+  var content = String(body.content || '');
+  var sections = body.sections || [];
+
+  var sheet = ensureProtocolsSheet_();
+  if (!num) num = String(sheet.getLastRow()); // строка 1 — шапка
+
+  // PDF из HTML
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' +
+    'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#111;padding:10px 14px;}' +
+    'h1{font-size:18px;text-align:center;margin:0 0 4px;}' +
+    '.meta{text-align:center;font-size:12px;margin-bottom:18px;}' +
+    'h2{font-size:13px;border-bottom:1px solid #000;padding-bottom:2px;margin:16px 0 5px;}' +
+    'p{margin:4px 0;line-height:1.5;}' +
+    '</style></head><body>' +
+    '<h1>' + escHtml_(title) + '</h1>' +
+    '<div class="meta">№ ' + escHtml_(num) + ' от ' + escHtml_(date) + '</div>';
+  sections.forEach(function(sec) {
+    html += '<h2>' + escHtml_(sec.org) + '</h2>';
+    (sec.items || []).forEach(function(it) { html += '<p>— ' + escHtml_(it) + '</p>'; });
+  });
+  html += '</body></html>';
+  var pdf = Utilities.newBlob('', 'text/html', 'p.html')
+    .setDataFromString(html, 'UTF-8')
+    .getAs('application/pdf')
+    .setName('Протокол_' + num + '_' + date.replace(/\./g, '-') + '.pdf');
+
+  // Каждому получателю — отдельное письмо
+  var sent = [], errors = [];
+  recipients.forEach(function(rc) {
+    var em = String(rc.email || '').trim();
+    var nm = String(rc.name || '').trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { errors.push(nm + ': некорректный адрес'); return; }
+    try {
+      MailApp.sendEmail({
+        to: em,
+        subject: title + ' № ' + num + ' от ' + date,
+        body: 'Добрый день!\n\nНаправляем протокол (во вложении).\n\n' + content,
+        attachments: [pdf],
+        name: 'СБ3 Шахматка'
+      });
+      sent.push(em);
+    } catch (e) { errors.push(nm + ': ' + e); }
+  });
+
+  // Фиксируем в листе «Протоколы»: обновляем строку с этим № или добавляем новую
+  var sentStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy HH:mm') + ' → ' + sent.join(', ');
+  var lastRow = sheet.getLastRow(), found = -1;
+  if (lastRow >= 2) {
+    var nums = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < nums.length; i++) {
+      if (String(nums[i][0]).trim() === num) { found = i + 2; break; }
+    }
+  }
+  if (found > 0) {
+    sheet.getRange(found, 5).setValue(sentStr);
+  } else {
+    var safeContent = /^[=+\-@]/.test(content) ? "'" + content : content;
+    sheet.appendRow([safeCell_(num), safeCell_(date), safeCell_(body.author), safeContent.slice(0, 45000), sentStr]);
+  }
+  SpreadsheetApp.flush();
+  return {ok: true, num: num, sent: sent, errors: errors};
 }
 
 function saveProtocol(body) {

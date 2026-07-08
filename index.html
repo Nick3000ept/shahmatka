@@ -156,6 +156,9 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .pi-del{border:none;background:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 4px;flex-shrink:0;opacity:.4;}
 .proto-item:hover .pi-del{opacity:1;}
 .pi-add{align-self:flex-start;font-size:10px;padding:2px 8px;margin-top:3px;}
+.send-row{display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 10px;border:1px solid var(--brd);border-radius:6px;color:#111;cursor:pointer;}
+.send-row input{cursor:pointer;}
+.send-row.nomail{opacity:.55;cursor:default;font-style:italic;}
 #print-area{display:none;}
 @media print{
   body.printing > *{display:none!important;}
@@ -750,12 +753,28 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <div class="proto-page">
     <div class="proto-toolbar">
       <button class="btn" onclick="closeProtoPreview()">✕ Закрыть</button>
-      <button class="btn btn-pri" onclick="printProtocol()">🖨 Печать / PDF</button>
+      <button class="btn" onclick="printProtocol()">🖨 Печать / PDF</button>
+      <button class="btn btn-pri" onclick="openSendModal()">📧 Отправить</button>
     </div>
     <div id="proto-doc">
       <div class="proto-title" contenteditable="true" id="proto-title">Протокол совещания по строительству СБ3</div>
       <div class="proto-meta">№ <span id="proto-num" contenteditable="true"></span> от <span id="proto-date" contenteditable="true"></span></div>
       <div id="proto-secs"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ВЫБОР ПОЛУЧАТЕЛЕЙ РАССЫЛКИ -->
+<div class="proto-overlay" id="send-overlay" style="z-index:620;">
+  <div class="proto-page" style="width:min(480px,94vw);">
+    <div class="proto-toolbar">
+      <button class="btn" onclick="closeSendModal()">✕ Закрыть</button>
+    </div>
+    <div class="proto-title" style="font-size:14px;">Получатели протокола</div>
+    <div style="font-size:11px;color:var(--ink3);text-align:center;">Снимите галочку, чтобы не отправлять. Отправитель — kuzkin@acons.group, каждому отдельное письмо с PDF.</div>
+    <div id="send-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+    <div class="proto-toolbar">
+      <button class="btn btn-pri" id="send-btn" onclick="sendProtocolMail()">📧 Отправить</button>
     </div>
   </div>
 </div>
@@ -2521,6 +2540,76 @@ async function printProtocol(){
   var done=function(){ document.body.classList.remove('printing'); window.removeEventListener('afterprint',done); };
   window.addEventListener('afterprint',done);
   setTimeout(function(){ window.print(); setTimeout(done,500); },50);
+}
+
+// ── Рассылка протокола на почту ───────────────────────────────────
+// Адреса — лист «Подрядчики», столбец E. Каждому — отдельное письмо с PDF (шлёт GAS/MailApp).
+// «Альфа Строй» исключён из получателей (решение 2026-07-08).
+var MAIL_EXCLUDE=['альфа строй'];
+async function openSendModal(){
+  if(!ADMIN_PWD){ openPwdModal(openSendModal); return; }
+  var s=serializeProto();
+  if(!s.sections.length){ toast('Протокол пуст','inf'); return; }
+  var emails=[];
+  try{
+    var r=await fetch(BASE+'?action=getContractorEmails&t='+Date.now());
+    var j=JSON.parse(await r.text());
+    emails=j.items||[];
+  }catch(ex){ toast('Не удалось загрузить адреса','err'); return; }
+  // Подрядчики из протокола: заголовки секций (кроме «Общие поручения») + подрядчики открытых поручений
+  var orgSet={};
+  s.sections.forEach(function(sec){ if(sec.org.toLowerCase()!=='общие поручения') orgSet[sec.org]=1; });
+  TASKS.filter(function(t){return t.status!=='выполнено'&&t.org;}).forEach(function(t){orgSet[t.org]=1;});
+  var rows='';
+  Object.keys(orgSet).sort().forEach(function(org){
+    var low=org.toLowerCase();
+    if(MAIL_EXCLUDE.some(function(x){return low.indexOf(x)>=0;})) return;
+    var rec=emails.find(function(c){return c.name===org;});
+    var email=rec?rec.email:'';
+    if(email){
+      rows+='<label class="send-row"><input type="checkbox" checked data-email="'+e(email)+'" data-name="'+e(org)+'"><b>'+e(org)+'</b> — '+e(email)+'</label>';
+    }else{
+      rows+='<div class="send-row nomail">'+e(org)+' — нет почты (заполните столбец E листа «Подрядчики»)</div>';
+    }
+  });
+  if(!rows){ toast('Нет получателей','inf'); return; }
+  document.getElementById('send-list').innerHTML=rows;
+  document.getElementById('send-overlay').classList.add('on');
+}
+function closeSendModal(){ document.getElementById('send-overlay').classList.remove('on'); }
+async function sendProtocolMail(){
+  if(!ADMIN_PWD){ openPwdModal(sendProtocolMail); return; }
+  var s=serializeProto();
+  var recs=[];
+  document.querySelectorAll('#send-list input[type=checkbox]:checked').forEach(function(cb){
+    recs.push({name:cb.dataset.name,email:cb.dataset.email});
+  });
+  if(!recs.length){ toast('Не выбраны получатели','inf'); return; }
+  var btn=document.getElementById('send-btn');
+  btn.disabled=true;
+  setSt('spin','Отправка протокола…');
+  try{
+    var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+      action:'sendProtocol', pwd:ADMIN_PWD, num:s.num, date:s.date, title:s.title,
+      content:s.text, sections:s.sections, recipients:recs, author:AUTHOR
+    })});
+    var j=JSON.parse(await r.text());
+    if(j.error) throw new Error(j.error);
+    if(j.num) document.getElementById('proto-num').textContent=j.num;
+    var okN=(j.sent||[]).length;
+    if(j.errors&&j.errors.length){
+      setSt('err','Отправлено частично');
+      toast('Отправлено: '+okN+'. Ошибки: '+j.errors.join('; '),'err',8000);
+    }else{
+      setSt('ok','Протокол отправлен');
+      toast('Отправлено писем: '+okN,'ok');
+      closeSendModal();
+    }
+  }catch(ex){
+    setSt('err','Ошибка');
+    toast('Ошибка отправки: '+ex.message,'err',6000);
+  }
+  btn.disabled=false;
 }
 
 async function markTaskDone(id){
