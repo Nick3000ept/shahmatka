@@ -127,6 +127,19 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .task-item .ti-text{font-size:12px;color:var(--ink);margin-top:2px;word-break:break-word;}
 .task-item .ti-meta{font-size:10px;color:var(--ink3);margin-top:3px;}
 .tasks-empty{font-size:12px;color:var(--ink3);text-align:center;padding:16px;}
+.prot-auto{display:flex;flex-direction:column;gap:4px;}
+.pa-org{font-size:11px;font-weight:700;color:var(--acc);margin-top:8px;padding-bottom:3px;border-bottom:1px solid var(--brd);}
+.pa-org:first-child{margin-top:0;}
+.pa-item{font-size:11px;color:var(--ink);padding:3px 0 3px 10px;line-height:1.45;}
+.pa-item .pa-due{font-family:var(--mono);font-size:10px;color:var(--ink3);white-space:nowrap;}
+.pa-item.pa-over{border-left:2px solid var(--red);}
+.pa-item.pa-over .pa-due{color:var(--red);font-weight:700;}
+.pa-item.pa-plan{border-left:2px solid var(--acc);}
+.tasks-done-hdr{font-size:11px;font-weight:600;color:var(--ink3);cursor:pointer;padding:6px 0;display:flex;align-items:center;gap:5px;user-select:none;margin-top:4px;}
+.tasks-done-hdr:hover{color:var(--ink);}
+.tasks-done-list{display:flex;flex-direction:column;gap:6px;overflow:hidden;}
+.tasks-done-list.collapsed{display:none;}
+.task-item.done{opacity:.55;}
 
 /* ── CHECKLIST BADGE & POPUP ── */
 .cl-badge{position:absolute;top:2px;right:2px;background:var(--acc);color:#fff;border-radius:8px;font-size:9px;font-weight:700;padding:0 4px;line-height:14px;z-index:2;font-family:var(--mono);pointer-events:none;}
@@ -701,6 +714,8 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     </div>
     <div class="prot-open-title">Открытые поручения</div>
     <div class="prot-open" id="prot-open"><div class="tasks-empty">Загрузка…</div></div>
+    <div class="prot-open-title">Из графика — просрочено и план на 7 дней</div>
+    <div class="prot-auto" id="prot-auto"></div>
   </div>
 </div>
 
@@ -2184,6 +2199,7 @@ function openProt(){
   document.getElementById('prot-btn').classList.add('btn-pri');
   resetProtRows();
   loadTasks();
+  renderAutoTasks();
 }
 function closeProt(){
   PROT_OPEN=false;
@@ -2227,7 +2243,7 @@ async function loadTasks(){
   var box=document.getElementById('prot-open');
   box.innerHTML='<div class="tasks-empty">Загрузка…</div>';
   try{
-    var r=await fetch(BASE+'?action=getTasks&t='+Date.now());
+    var r=await fetch(BASE+'?action=getTasks&all=1&t='+Date.now());
     var j=JSON.parse(await r.text());
     TASKS=j.tasks||[];
     renderTasksList();
@@ -2235,19 +2251,37 @@ async function loadTasks(){
     box.innerHTML='<div class="tasks-empty">Ошибка загрузки</div>';
   }
 }
+function taskItemHtml(t, isDone){
+  return '<div class="task-item'+(isDone?' done':'')+'" data-tid="'+e(t.id)+'">'+
+    '<div class="ti-main">'+
+      '<div class="ti-org">'+e(t.org)+'</div>'+
+      '<div class="ti-text">'+e(t.text)+'</div>'+
+      '<div class="ti-meta">'+(t.due?'Срок: '+e(t.due)+' · ':'')+'создано '+e(t.created)+(t.author?' · '+e(t.author):'')+'</div>'+
+    '</div>'+
+    (isDone?'<span style="font-size:10px;color:var(--ink3);flex-shrink:0;">✓</span>':
+      '<button class="btn" onclick="markTaskDone(\''+e(t.id)+'\')">✓ Выполнено</button>')+
+  '</div>';
+}
 function renderTasksList(){
   var box=document.getElementById('prot-open');
-  if(!TASKS.length){ box.innerHTML='<div class="tasks-empty">Открытых поручений нет</div>'; return; }
-  box.innerHTML=TASKS.map(function(t){
-    return '<div class="task-item">'+
-      '<div class="ti-main">'+
-        '<div class="ti-org">'+e(t.org)+'</div>'+
-        '<div class="ti-text">'+e(t.text)+'</div>'+
-        '<div class="ti-meta">'+(t.due?'Срок: '+e(t.due)+' · ':'')+'создано '+e(t.created)+(t.author?' · '+e(t.author):'')+'</div>'+
-      '</div>'+
-      '<button class="btn" onclick="markTaskDone(\''+e(t.id)+'\')">✓ Выполнено</button>'+
-    '</div>';
-  }).join('');
+  var open=TASKS.filter(function(t){return t.status!=='выполнено';});
+  var done=TASKS.filter(function(t){return t.status==='выполнено';});
+  var html='';
+  if(!open.length) html+='<div class="tasks-empty">Открытых поручений нет</div>';
+  else html+=open.map(function(t){return taskItemHtml(t,false);}).join('');
+  if(done.length){
+    html+='<div class="tasks-done-hdr" onclick="toggleDoneList(this)">'+
+      '<span class="done-arrow">▸</span> Выполнено ('+done.length+')</div>'+
+      '<div class="tasks-done-list collapsed">'+
+        done.map(function(t){return taskItemHtml(t,true);}).join('')+
+      '</div>';
+  }
+  box.innerHTML=html;
+}
+function toggleDoneList(hdr){
+  var list=hdr.nextElementSibling;
+  var collapsed=list.classList.toggle('collapsed');
+  hdr.querySelector('.done-arrow').textContent=collapsed?'▸':'▾';
 }
 // Сохраняем все заполненные строки поручений
 async function saveProtTasks(){
@@ -2278,6 +2312,63 @@ async function saveProtTasks(){
     loadTasks();
   }catch(ex){ setSt('err','Ошибка'); toast('Ошибка сохранения: '+ex.message,'err'); }
 }
+// ── Автопоручения из графика ──
+// Правила (2026-07-08): дата — только ручная dateEnd (столбец I);
+// просрочено: dateEnd < сегодня; план: dateEnd в ближайшие 7 дней;
+// исключаются статусы «СМР окончены» и «На площадке»;
+// группировка: подрядчик → работа+корпус+срок, этажи списком.
+function floorsCompact(floors){
+  // [4,5,6,7,12,'П'] → "4–7, 12, П"
+  var nums=floors.filter(function(f){return typeof f==='number';}).sort(function(a,b){return a-b;});
+  var rest=floors.filter(function(f){return typeof f!=='number';}).map(String).sort();
+  var parts=[],i=0;
+  while(i<nums.length){
+    var j=i;
+    while(j+1<nums.length&&nums[j+1]===nums[j]+1) j++;
+    parts.push(j-i>=2?nums[i]+'–'+nums[j]:(j>i?nums[i]+', '+nums[j]:String(nums[i])));
+    i=j+1;
+  }
+  return parts.concat(rest).join(', ');
+}
+function collectAutoTasks(){
+  // Собираем из ROWS: {org: {key: {work,corpus,dueMs,due,over,floors[]}}}
+  var weekEnd=TODAY_MS+7*24*3600*1000;
+  var byOrg={};
+  ROWS.forEach(function(r){
+    if(!r.org||!r.dateEnd) return;
+    var st=S2CSS[r.status||'']||'s-empty';
+    if(st==='s-done'||st==='s-onsite') return;
+    var ms=parseDateMs(fmtDate(r.dateEnd));
+    if(!ms) return;
+    var over=ms<TODAY_MS;
+    if(!over&&ms>weekEnd) return; // дальше горизонта — не берём
+    var key=r.work+'|'+r.corpus+'|'+ms;
+    if(!byOrg[r.org]) byOrg[r.org]={};
+    if(!byOrg[r.org][key]) byOrg[r.org][key]={work:r.work,corpus:r.corpus,dueMs:ms,due:fmtDate(r.dateEnd),over:over,floors:[]};
+    byOrg[r.org][key].floors.push(r.floor);
+  });
+  return byOrg;
+}
+function renderAutoTasks(){
+  var box=document.getElementById('prot-auto');
+  var byOrg=collectAutoTasks();
+  var orgs=Object.keys(byOrg).sort();
+  if(!orgs.length){ box.innerHTML='<div class="tasks-empty">Нет работ с ручной датой окончания в просрочке или на 7 дней</div>'; return; }
+  var html='';
+  orgs.forEach(function(org){
+    var items=Object.values(byOrg[org]);
+    // Сначала просроченные (старые выше), потом план по возрастанию срока
+    items.sort(function(a,b){ return (a.over===b.over)?a.dueMs-b.dueMs:(a.over?-1:1); });
+    html+='<div class="pa-org">'+e(org)+'</div>';
+    items.forEach(function(it){
+      html+='<div class="pa-item '+(it.over?'pa-over':'pa-plan')+'">'
+        +e(it.work)+', '+e(it.corpus)+': эт. '+e(floorsCompact(it.floors))
+        +' — <span class="pa-due">'+(it.over?'просрочено, срок был ':'срок ')+e(it.due)+'</span></div>';
+    });
+  });
+  box.innerHTML=html;
+}
+
 async function markTaskDone(id){
   if(!ADMIN_PWD){ openPwdModal(function(){markTaskDone(id);}); return; }
   try{
@@ -2286,7 +2377,9 @@ async function markTaskDone(id){
     })});
     var j=JSON.parse(await r.text());
     if(j.error){ toast(j.error,'err'); return; }
-    TASKS=TASKS.filter(function(t){ return t.id!==id; });
+    // Помечаем локально и перерисовываем — без перезагрузки списка
+    var t=TASKS.find(function(t){return t.id===id;});
+    if(t) t.status='выполнено';
     renderTasksList();
     toast('Отмечено выполненным','ok');
   }catch(ex){ toast('Ошибка','err'); }
