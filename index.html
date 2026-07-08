@@ -773,6 +773,10 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <div class="proto-title" style="font-size:14px;">Получатели протокола</div>
     <div style="font-size:11px;color:var(--ink3);text-align:center;">Снимите галочку, чтобы не отправлять. Отправитель — kuzkin@acons.group, каждому отдельное письмо с PDF.</div>
     <div id="send-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+    <div style="display:flex;gap:6px;">
+      <input type="email" id="send-manual" placeholder="Добавить адрес вручную…" style="flex:1;padding:7px 10px;border:1px solid var(--brd2);border-radius:var(--r);font-size:12px;outline:none;color:var(--ink);" onkeydown="if(event.key==='Enter')sendAddManual()">
+      <button class="btn" onclick="sendAddManual()">+ Добавить</button>
+    </div>
     <div class="proto-toolbar">
       <button class="btn btn-pri" id="send-btn" onclick="sendProtocolMail()">📧 Отправить</button>
     </div>
@@ -2478,6 +2482,13 @@ function renderAutoTasks(){
 // ── Предпросмотр протокола (редактируемый) ────────────────────────
 // Состав: план на 7 дней из графика + открытые ручные поручения, по подрядчикам.
 // Правки живут только в предпросмотре; при печати текст сохраняется в лист «Протоколы».
+// PROTO_EXCLUDE: эти подрядчики не попадают ни в документ протокола, ни в рассылку
+// (решение 2026-07-08: Альфа Строй, Овчинников, Смирнов, Джамал)
+var PROTO_EXCLUDE=['альфа строй','овчинников','смирнов','джамал'];
+function isProtoExcluded(org){
+  var low=String(org||'').toLowerCase();
+  return PROTO_EXCLUDE.some(function(x){return low.indexOf(x)>=0;});
+}
 function protoItemHtml(text){
   return '<div class="proto-item"><span class="pi-text" contenteditable="true">'+e(text)+'</span>'+
     '<button class="pi-del" title="Убрать строку" onclick="protoDelItem(this)">✕</button></div>';
@@ -2485,8 +2496,9 @@ function protoItemHtml(text){
 function openProtoPreview(){
   if(!ADMIN_PWD){ openPwdModal(openProtoPreview); return; }
   var byOrg=collectAutoTasks();
-  var openTasks=TASKS.filter(function(t){return t.status!=='выполнено';});
-  var orgs=Object.keys(byOrg).sort();
+  // Исключённые подрядчики (PROTO_EXCLUDE) не попадают ни в секции, ни в общие поручения
+  var openTasks=TASKS.filter(function(t){return t.status!=='выполнено'&&!isProtoExcluded(t.org);});
+  var orgs=Object.keys(byOrg).filter(function(o){return !isProtoExcluded(o);}).sort();
   if(!orgs.length&&!openTasks.length){ toast('Нет данных для протокола','inf'); return; }
   var html='';
   // Первой группой — «Общие поручения»: все актуальные ручные поручения
@@ -2577,8 +2589,7 @@ async function printProtocol(){
 
 // ── Рассылка протокола на почту ───────────────────────────────────
 // Адреса — лист «Подрядчики», столбец E. Каждому — отдельное письмо с PDF (шлёт GAS/MailApp).
-// «Альфа Строй» исключён из получателей (решение 2026-07-08).
-var MAIL_EXCLUDE=['альфа строй'];
+// Исключения получателей — общий список PROTO_EXCLUDE (см. выше).
 async function openSendModal(){
   if(!ADMIN_PWD){ openPwdModal(openSendModal); return; }
   var s=serializeProto();
@@ -2595,8 +2606,7 @@ async function openSendModal(){
   TASKS.filter(function(t){return t.status!=='выполнено'&&t.org;}).forEach(function(t){orgSet[t.org]=1;});
   var rows='';
   Object.keys(orgSet).sort().forEach(function(org){
-    var low=org.toLowerCase();
-    if(MAIL_EXCLUDE.some(function(x){return low.indexOf(x)>=0;})) return;
+    if(isProtoExcluded(org)) return;
     var rec=emails.find(function(c){return c.name===org;});
     var email=rec?rec.email:'';
     if(email){
@@ -2610,6 +2620,25 @@ async function openSendModal(){
   document.getElementById('send-overlay').classList.add('on');
 }
 function closeSendModal(){ document.getElementById('send-overlay').classList.remove('on'); }
+// Ручное добавление адреса в получатели
+function sendAddManual(){
+  var inp=document.getElementById('send-manual');
+  var em=inp.value.trim();
+  if(!em) return;
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast('Некорректный адрес','err'); return; }
+  // Дубликат — не добавляем
+  var dup=false;
+  document.querySelectorAll('#send-list input[type=checkbox]').forEach(function(cb){
+    if(cb.dataset.email.toLowerCase()===em.toLowerCase()) dup=true;
+  });
+  if(dup){ toast('Такой адрес уже в списке','inf'); inp.value=''; return; }
+  var label=document.createElement('label');
+  label.className='send-row';
+  label.innerHTML='<input type="checkbox" checked data-email="'+e(em)+'" data-name="Вручную"><b>Вручную</b> — '+e(em);
+  document.getElementById('send-list').appendChild(label);
+  inp.value='';
+  inp.focus();
+}
 async function sendProtocolMail(){
   if(!ADMIN_PWD){ openPwdModal(sendProtocolMail); return; }
   var s=serializeProto();
