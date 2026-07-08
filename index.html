@@ -2434,24 +2434,24 @@ function openProtoPreview(){
   if(!ADMIN_PWD){ openPwdModal(openProtoPreview); return; }
   var byOrg=collectAutoTasks();
   var openTasks=TASKS.filter(function(t){return t.status!=='выполнено';});
-  // Объединяем подрядчиков из графика и из ручных поручений
-  var orgSet={};
-  Object.keys(byOrg).forEach(function(o){orgSet[o]=1;});
-  openTasks.forEach(function(t){if(t.org)orgSet[t.org]=1;});
-  var orgs=Object.keys(orgSet).sort();
-  if(!orgs.length){ toast('Нет данных для протокола','inf'); return; }
+  var orgs=Object.keys(byOrg).sort();
+  if(!orgs.length&&!openTasks.length){ toast('Нет данных для протокола','inf'); return; }
   var html='';
+  // Первой группой — «Общие поручения»: все актуальные ручные поручения
+  if(openTasks.length){
+    html+='<div class="proto-sec"><div class="proto-org" contenteditable="true">Общие поручения</div>';
+    openTasks.forEach(function(t){
+      html+=protoItemHtml((t.org?t.org+': ':'')+t.text+(t.due?' — срок '+t.due:''));
+    });
+    html+='<button class="btn pi-add" onclick="protoAddItem(this)">+ строка</button></div>';
+  }
+  // Затем секции подрядчиков — только работы из графика
   orgs.forEach(function(org){
     html+='<div class="proto-sec"><div class="proto-org" contenteditable="true">'+e(org)+'</div>';
-    if(byOrg[org]){
-      Object.values(byOrg[org]).sort(function(a,b){return a.dueMs-b.dueMs;}).forEach(function(it){
-        var authors=Object.keys(it.authors);
-        html+=protoItemHtml(it.work+', '+it.corpus+': эт. '+floorsCompact(it.floors)
-          +' — срок '+it.due+(authors.length?' (поставил: '+authors.join(', ')+')':''));
-      });
-    }
-    openTasks.filter(function(t){return t.org===org;}).forEach(function(t){
-      html+=protoItemHtml(t.text+(t.due?' — срок '+t.due:''));
+    Object.values(byOrg[org]).sort(function(a,b){return a.dueMs-b.dueMs;}).forEach(function(it){
+      var authors=Object.keys(it.authors);
+      html+=protoItemHtml(it.work+', '+it.corpus+': эт. '+floorsCompact(it.floors)
+        +' — срок '+it.due+(authors.length?' (поставил: '+authors.join(', ')+')':''));
     });
     html+='<button class="btn pi-add" onclick="protoAddItem(this)">+ строка</button></div>';
   });
