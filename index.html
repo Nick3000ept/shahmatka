@@ -833,7 +833,7 @@ var FLOOR_ROW_MAP = new Map(); // floor → [rowId], перестраивает�
 var ROWS_MAP = new Map();    // rowId → row object, перестраивается при loadData()
 
 var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, FPROTOCOL=false, SHOW_CL=false, SHOW_EMPTY=false;
-var CHECK_LISTS=[], CL_MAP={}, STAFFING_DATA=[];
+var CHECK_LISTS=[], CL_MAP={}, STAFFING_DATA=[], STAFF_OPEN=false;
 var WORKS=[];
 
 function renderWorkDrop(query){
@@ -2908,8 +2908,12 @@ function buildStaffingHtml(){
   var maxVal=0;
   weekKeys.forEach(function(wk){var t=0;contractors.forEach(function(c){t+=wkAvg(wk,c);});if(t>maxVal)maxVal=t;});
   var BAR_H=140, p2=function(n){return n<10?'0'+n:String(n);};
+  // Раскрывающийся блок: по умолчанию свёрнут, состояние живёт в STAFF_OPEN
   var h='<div class="staff-section">';
-  h+='<div class="staff-title">Среднее количество монтажников на площадке — последние 3 мес.</div>';
+  h+='<div class="staff-title" onclick="toggleStaffSection()" style="cursor:pointer;user-select:none;padding-bottom:'+(STAFF_OPEN?'0':'12px')+';">'
+    +'<span id="staff-arrow">'+(STAFF_OPEN?'▾':'▸')+'</span> Численность монтажников</div>';
+  h+='<div id="staff-body" style="'+(STAFF_OPEN?'':'display:none;')+'">';
+  h+='<div style="font-size:10px;color:var(--ink3);margin:4px 0 8px;">Среднее количество монтажников на площадке — последние 3 мес.</div>';
   h+='<div class="staff-legend">';
   contractors.forEach(function(c){
     h+='<div class="staff-leg-item"><div style="width:10px;height:10px;border-radius:2px;background:'+cmap[c]+';flex-shrink:0;"></div>'+e(c)+'</div>';
@@ -2929,8 +2933,15 @@ function buildStaffingHtml(){
     });
     h+='</div><div class="staff-xlbl">'+lbl+'</div></div>';
   });
-  h+='</div></div></div>';
+  h+='</div></div></div></div>';
   return h;
+}
+function toggleStaffSection(){
+  STAFF_OPEN=!STAFF_OPEN;
+  var body=document.getElementById('staff-body');
+  var arrow=document.getElementById('staff-arrow');
+  if(body) body.style.display=STAFF_OPEN?'':'none';
+  if(arrow) arrow.textContent=STAFF_OPEN?'▾':'▸';
 }
 
 // ─── ЧЕК-ЛИСТЫ ────────────────────────────────────────────────────
