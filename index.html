@@ -156,6 +156,19 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .pi-del{border:none;background:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 4px;flex-shrink:0;opacity:.4;}
 .proto-item:hover .pi-del{opacity:1;}
 .pi-add{align-self:flex-start;font-size:10px;padding:2px 8px;margin-top:3px;}
+/* ── Сводная по месяцам ── */
+.pv-table{border-collapse:collapse;width:100%;font-size:11px;}
+.pv-table th{position:sticky;top:0;background:var(--bg3);color:var(--ink3);font-size:9px;text-transform:uppercase;letter-spacing:.05em;padding:6px 8px;border-bottom:1px solid var(--brd2);text-align:center;white-space:nowrap;z-index:2;}
+.pv-table th:first-child{text-align:left;}
+.pv-table td{padding:5px 8px;border-bottom:1px solid var(--brd);text-align:center;color:var(--ink);font-family:var(--mono);}
+.pv-table td:first-child{text-align:left;font-family:inherit;}
+.pv-grp td{background:var(--bg3)!important;font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;border-top:2px solid var(--brd2);}
+.pv-work{cursor:pointer;}
+.pv-work:hover td{background:var(--bg3);}
+.pv-detail{display:none;}
+.pv-detail td{color:var(--ink3);font-size:10px;}
+.pv-detail td:first-child{padding-left:24px;}
+.pv-arrow{display:inline-block;width:12px;color:var(--ink3);}
 .send-row{display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 10px;border:1px solid var(--brd);border-radius:6px;color:#111;cursor:pointer;}
 .send-row input{cursor:pointer;}
 .send-row.nomail{opacity:.55;cursor:default;font-style:italic;}
@@ -761,6 +774,17 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
       <div class="proto-meta">№ <span id="proto-num" contenteditable="true"></span> от <span id="proto-date" contenteditable="true"></span></div>
       <div id="proto-secs"></div>
     </div>
+  </div>
+</div>
+
+<!-- СВОДНАЯ ПО МЕСЯЦАМ -->
+<div class="proto-overlay" id="pivot-overlay">
+  <div class="proto-page" style="width:min(980px,96vw);max-height:92vh;">
+    <div class="proto-toolbar" style="justify-content:space-between;align-items:center;">
+      <div class="proto-title" style="font-size:14px;text-align:left;">📅 Сводная: этажи по месяцам (текущая дата окончания)</div>
+      <button class="btn" onclick="closePivot()">✕ Закрыть</button>
+    </div>
+    <div id="pivot-body" style="overflow:auto;max-height:78vh;"></div>
   </div>
 </div>
 
@@ -2944,6 +2968,82 @@ function toggleStaffSection(){
   if(arrow) arrow.textContent=STAFF_OPEN?'▾':'▸';
 }
 
+// ─── СВОДНАЯ ПО МЕСЯЦАМ ───────────────────────────────────────────
+// Строки: работы по месту (Этаж → МОП → Квартира). Столбцы: месяцы.
+// Ячейка: число этажей (строк шахматки) с текущей датой окончания (currentDate) в этом месяце.
+// Клик по работе — разбивка по подрядчикам. Учитываются фильтры FC/FO/FM/FL1/FL2/FW/FKP.
+function openPivot(){
+  document.getElementById('pivot-body').innerHTML=buildPivotHtml();
+  document.getElementById('pivot-overlay').classList.add('on');
+}
+function closePivot(){ document.getElementById('pivot-overlay').classList.remove('on'); }
+function buildPivotHtml(){
+  var rows=ROWS.filter(function(r){
+    if(!r.currentDate) return false;
+    if(FC.size>0&&!FC.has(r.corpus)) return false;
+    if(FO&&r.org!==FO) return false;
+    if(FM&&r.place!==FM) return false;
+    if(FL1&&r.lvl1!==FL1) return false;
+    if(FL2&&r.lvl2!==FL2) return false;
+    if(FW.size>0&&!FW.has(r.work)) return false;
+    if(FKP&&!r.kp) return false;
+    return true;
+  });
+  if(!rows.length) return '<div class="tasks-empty">Нет строк с текущей датой окончания (по активным фильтрам)</div>';
+  var monthsSet={}, groups={};
+  rows.forEach(function(r){
+    var ms=parseDateMs(fmtDate(r.currentDate));
+    if(!ms) return;
+    var d=new Date(ms);
+    var ym=d.getFullYear()*100+(d.getMonth()+1);
+    monthsSet[ym]=1;
+    var place=r.place||'Прочее';
+    var g=groups[place]=groups[place]||{};
+    var gw=g[r.work]=g[r.work]||{tot:{},orgs:{}};
+    gw.tot[ym]=(gw.tot[ym]||0)+1;
+    var org=r.org||'— без подрядчика —';
+    gw.orgs[org]=gw.orgs[org]||{};
+    gw.orgs[org][ym]=(gw.orgs[org][ym]||0)+1;
+  });
+  var yms=Object.keys(monthsSet).map(Number).sort(function(a,b){return a-b;});
+  var p2=function(n){return n<10?'0'+n:String(n);};
+  var ymLbl=function(ym){return p2(ym%100)+'.'+String(Math.floor(ym/100)).slice(2);};
+  var placeOrder=['Этаж','МОП','Квартира'];
+  var places=Object.keys(groups).sort(function(a,b){
+    var ia=placeOrder.indexOf(a),ib=placeOrder.indexOf(b);
+    if(ia<0)ia=99; if(ib<0)ib=99;
+    return ia-ib||a.localeCompare(b);
+  });
+  var h='<table class="pv-table"><thead><tr><th>Работа</th>';
+  yms.forEach(function(ym){h+='<th>'+ymLbl(ym)+'</th>';});
+  h+='</tr></thead><tbody>';
+  var idx=0;
+  places.forEach(function(place){
+    h+='<tr class="pv-grp"><td colspan="'+(yms.length+1)+'">'+e(place)+'</td></tr>';
+    Object.keys(groups[place]).sort().forEach(function(work){
+      var gw=groups[place][work];
+      h+='<tr class="pv-work" onclick="togglePvDetail('+idx+')"><td><span class="pv-arrow" id="pv-arr-'+idx+'">▸</span>'+e(work)+'</td>';
+      yms.forEach(function(ym){h+='<td>'+(gw.tot[ym]||'')+'</td>';});
+      h+='</tr>';
+      Object.keys(gw.orgs).sort().forEach(function(org){
+        h+='<tr class="pv-detail pv-d-'+idx+'"><td>'+e(org)+'</td>';
+        yms.forEach(function(ym){h+='<td>'+(gw.orgs[org][ym]||'')+'</td>';});
+        h+='</tr>';
+      });
+      idx++;
+    });
+  });
+  h+='</tbody></table>';
+  return h;
+}
+function togglePvDetail(idx){
+  var rows=document.querySelectorAll('.pv-d-'+idx);
+  var arrow=document.getElementById('pv-arr-'+idx);
+  var show=rows.length&&rows[0].style.display!=='table-row';
+  rows.forEach(function(tr){tr.style.display=show?'table-row':'none';});
+  if(arrow) arrow.textContent=show?'▾':'▸';
+}
+
 // ─── ЧЕК-ЛИСТЫ ────────────────────────────────────────────────────
 function loadCheckLists(){
   if(CHECK_LISTS.length>0){buildClMap();render();return;}
@@ -3054,9 +3154,9 @@ function clOpenLink(url){if(url) window.open(url,'_blank');}
       <div class="an-title">Аналитика выполнения <span id="an-date" style="font-size:11px;font-weight:400;color:var(--ink3);margin-left:6px;font-family:var(--mono);"></span></div>
       <div class="an-sub" id="an-sub">По отфильтрованным данным</div>
     </div>
+    <button class="btn" onclick="openPivot()" style="padding:3px 9px;font-size:11px;flex-shrink:0;" title="Сводная по месяцам">📅 Сводная</button>
     <button class="btn" onclick="closeAnalytics()" style="padding:3px 9px;font-size:12px;flex-shrink:0;">✕</button>
   </div>
-  <div class="an-note">Учитываются только строки со статусом «СМР окончены». За неделю/месяц — по дате окончания.</div>
   <div class="an-body" id="an-body"></div>
 </div>
 
