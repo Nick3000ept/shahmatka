@@ -1,19 +1,21 @@
 # СБ3 · Шахматка — Административная панель
 
+> 📍 **[CODE_MAP.md](CODE_MAP.md)** — карта функций, переменных и DOM-элементов `index.html`. Перед правкой кода смотреть туда, а не читать весь файл.
+
 ## Стек
 - **Frontend**: `index.html` — один файл, чистый HTML/CSS/JS, без фреймворков
 - **Backend**: `script.gs` — Google Apps Script (хранится локально для версионирования, деплоится вручную в GAS редактор)
 - **Хостинг**: GitHub Pages — `https://nick3000ept.github.io/shahmatka/` (репозиторий публичный)
 - **Репозиторий**: `https://github.com/Nick3000ept/shahmatka`
 
-## Деплой (все команды по запросу "задеплой")
+## Деплой (выполняется сразу после завершения правок)
 ```bash
 cd "c:/Users/User/YandexDisk/VS_hub/СБ3_Шахматка"
 # 1. Google Apps Script (бэкенд)
 clasp push --force
 clasp deploy --deploymentId AKfycbwBRlgDFkLzGfJngvBczEBLaXMxlr3l4jGai_-ZHw28EVJrogYvxsqnecuZbZS3EJdG
 # 2. Git + GitHub Pages (фронтенд деплоится автоматически после git push)
-git add index.html script.gs appsscript.json CLAUDE.md .gitignore .claspignore tests/test.js
+git add index.html script.gs appsscript.json CLAUDE.md CODE_MAP.md .gitignore .claspignore tests/test.js
 git commit -m "описание изменений"
 git push
 ```
@@ -25,6 +27,7 @@ git push
   index.html   ← вся фронтенд-логика (шахматка, UI, запросы к GAS)
   script.gs    ← Apps Script бэкенд (хранится здесь, деплоится в Google)
   CLAUDE.md    ← этот файл
+  CODE_MAP.md  ← карта функций index.html
   .gitignore
 ```
 
@@ -43,43 +46,12 @@ git push
 
 Ссылка для подрядчика: `https://nick3000ept.github.io/shahmatka/?contractor=Название`
 
-## Правила безопасности (СТРОГО)
+## Правила безопасности
 
-### Файлы — разрешено редактировать ТОЛЬКО:
-- `index.html`
-- `script.gs`
-- `CLAUDE.md`
-- `appsscript.json`
-- `.gitignore`
+> Общие правила (git, файлы, деплой, стиль работы) — в корневом [../CLAUDE.md](../CLAUDE.md). Здесь — специфика проекта.
 
-### Никогда НЕ делать:
-- НЕ удалять файлы из проекта
-- НЕ трогать файлы вне папки `СБ3_Шахматка/`
-- НЕ использовать `git reset --hard`, `git push --force`, `git clean`
-- НЕ удалять ветки git
-- НЕ деплоить без явной команды "задеплой" от пользователя
-- НЕ менять настройки GAS (права доступа, триггеры) — только код в `script.gs`
-- НЕ трогать другие проекты в `VS_hub/`
-
-### Google Sheets — никогда:
-- НЕ добавлять код для записи в столбцы A–F и O+
-- НЕ удалять строки/листы через скрипт
-- Любые изменения данных только через существующий API (saveRow/saveAll)
-
-### Перед деплоем — всегда:
-- Убедиться что изменения только в разрешённых файлах
-- Деплоить только по явной команде пользователя
-
-## Важные правила
-- Все изменения только в `index.html` и `script.gs`
-- Пользователь не умеет кодить — работает полностью через Claude Code
-- Пользователь описывает задачу словами, Claude сам решает где и что менять
-- Если отступление от правил безопасности принесёт ощутимую пользу проекту — предложить пользователю на решение, не делать молча
-
-## Workflow с пользователем
-1. Пользователь описывает что хочет изменить
-2. Claude вносит правки в нужные файлы
-3. По команде "задеплой" — clasp push/deploy + git commit + push
+- Разрешено редактировать ТОЛЬКО: `index.html`, `script.gs`, `appsscript.json`, `CLAUDE.md`, `CODE_MAP.md`, `.gitignore`
+- Google Sheets: НЕ писать в столбцы A–F и O+ (dropdown-валидация); НЕ удалять строки/листы через скрипт; изменения данных только через saveRow/saveAll
 
 ## На новом компьютере
 ```bash
@@ -208,190 +180,3 @@ O+= не трогать никогда (P(15)=baseDate, Q(16)=currentDate — т
 - **beforeunload** — браузер показывает предупреждение «покинуть страницу?» если в MOD есть несохранённые изменения.
 - **Ответ сервера** — если GAS вернул не JSON (HTML-редирект при сбое), показывается предупреждение «проверьте данные в таблице» вместо тихого успеха.
 - **Поля дат** — ввод с клавиатуры разрешён (браузер сам не даёт сохранить неполную дату через onchange).
-
----
-
-## Карта функций index.html (для навигации без чтения всего файла)
-
-### Глобальные переменные
-- `BASE` — URL GAS-скрипта (захардкоден в window.onload)
-- `ROWS[]` — все строки из Google Sheets
-- `MOD{}` — несохранённые изменения `{rowId: {status, pct, dateEnd, comment, org}}`
-- `SEL` — Set rowId выбранных ячеек (мультивыбор)
-- `CUR` — текущая строка в одиночном попапе
-- `FC` — Set корпусов для фильтра; `FO` — орг; `FM` — место; `FL1` — вид работ; `FL2` — группа работ; `FW` — Set работ; `FKP` — чекбокс КП; `FDATE` — фильтр по дате (только для администратора)
-- `FPLAN7` — bool, показывать только строки с currentDate ≤ сегодня+7д
-- `FPLAN30` — bool, показывать только строки с currentDate ≤ сегодня+30д
-- `FOVERDUE` — bool, показывать только просроченные строки (currentDate < сегодня, не «окончены» и не «передано»)
-- `ANALYTICS_OPEN` — bool, панель аналитики открыта
-- `COL_KEYS[]` — порядок столбцов: `{corpus, place, lvl2, work, extra1, key, factNum}`
-- `FLOOR_LIST[]` — порядок этажей (по убыванию)
-- `CONTRACTORS[]` — список подрядчиков
-- `WORKS[]` — список видов работ
-- `MS_DRAFT` — черновик мультиредактирования `{status, dateEnd, pct}`
-- `S2CSS{}` / `CSS2S{}` — маппинг статус↔CSS-класс
-- `ZOOM` — текущий масштаб (10–150%)
-- `AUTHOR` — имя пользователя для сохранения
-- `CONTRACTOR` — имя подрядчика из URL-параметра `?contractor=`
-- `IS_ADMIN` — флаг администратора (из sessionStorage после ввода пароля)
-- `PRESETS{}` — пресеты фильтров из localStorage (`sb3_presets`)
-- `ACTIVE_PRESET` — имя активного пресета или `'__none__'` (Без фильтров) или `null`
-
-### Инициализация
-- `window.onload` — восстанавливает zoom/автора из localStorage, загружает данные, вешает хоткеи (Ctrl+S, Esc), регистрирует `beforeunload` для защиты несохранённых изменений
-
-### Масштаб
-- `changeZoom(delta)` — изменить масштаб на delta%; сохраняет в localStorage
-- `applyZoom()` — применяет CSS zoom к #zoom-wrap
-
-### Автор
-- `saveAuthor(v)` — сохраняет имя автора в AUTHOR и localStorage
-
-### Данные / загрузка
-- `loadContractors()` — загружает список подрядчиков из GAS, кэширует в localStorage
-- `renderContractorSelect(selected)` — обновляет `<select#p-contractor>` в попапе
-- `reload()` — вызывает loadData()
-- `loadData()` — главная загрузка: fetch getRows → ROWS → buildFilters() → render()
-
-### Фильтры
-- `buildFilters()` — строит чипы корпусов + select орг/место/вид работ/группа работ + список работ из ROWS
-- `setCorpus(el, v)` — переключает фильтр корпуса (FC); v='' → все
-- `applyFilters()` — читает значения из DOM → FO/FM/FL1/FL2/FKP → render()
-- `applyFiltersAndTags()` — то же + обновляет теги фильтров
-- `renderFilterTags()` — рисует плашки активных фильтров под filterbar
-- `clearFilterTag(i)` — сбрасывает i-й тег фильтра
-- `toggleSP(on)` — переключает режим "показывать подрядчика" в ячейках (SHOW_SP)
-
-**Чекбоксы планирования и просрочки (FOVERDUE/FPLAN7/FPLAN30):**
-- Работают через `currentDate` строки (поле Q из GAS)
-- FOVERDUE: `currentDate < сегодня (00:00)` И статус не `s-done` / `s-accepted`
-- FPLAN7/FPLAN30: `currentDate ≤ Date.now() + 7/30 * 24h` (независимо от статуса)
-- Если ни один из трёх не активен — блок фильтра не применяется
-
-### Пресеты фильтров
-- `PRESETS{}` — словарь `{name: {FC, FO, FM, FL1, FL2, FW, FKP}}`, хранится в localStorage `sb3_presets`
-- `ACTIVE_PRESET` — имя активного пресета, `'__none__'` (Без фильтров), или `null`
-- `applyNoFilter()` — сбрасывает все фильтры, ставит `ACTIVE_PRESET='__none__'`
-- `renderPresetChips()` — перерисовывает чипы: первым всегда неудаляемый «Без фильтров»
-- `presetAddClick()` / `presetCancelClick()` — показывает/скрывает поле ввода имени
-- `savePreset()` — сохраняет текущий фильтр как пресет
-- `applyPreset(name)` — применяет пресет (FC/FO/FM/FL1/FL2/FW/FKP) → render
-- `deletePreset(name)` — удаляет пресет из PRESETS и localStorage
-
-### Фильтры в DOM
-- `#forg` — Организация
-- `#fplace` — Место
-- `#flvl1` — Вид работ (Факт_уровень_1 из Факт_работы col E)
-- `#flvl2` — Группа работ (Факт_уровень_2 из Факт_работы col F)
-
-### Дропдаун работ
-- `renderWorkDrop(query)` — перерисовывает список работ с поиском
-- `selWork(w)` — выбрать работу (w='') = сбросить все; обновляет FW
-- `toggleWork(w)` — переключить одну работу в FW
-- `updateWorkInp()` — обновляет теги выбранных работ в поле ввода
-- `showWorkDrop()` / `hideWorkDrop()` — показать/скрыть дропдаун
-- `workSearchFilter(q)` — фильтрация при вводе в поиск работ
-- `renderDeferred()` — вызывает render() через 150мс дебаунс
-
-### Главный рендер
-- `render()` — ОСНОВНАЯ ФУНКЦИЯ: фильтрует ROWS → строит HTML таблицы → вставляет в #board
-  - COL_KEYS строится за один O(n) проход по строкам (не вложенные циклы!)
-  - Ключ колонки включает corpus+place+lvl2+work+extra1
-  - При наличии extra1 — 5 строк в thead (доп. строка с группировкой)
-  - Ячейки подрядчика с чужими работами получают класс `.not-mine` (opacity 0.35)
-- `statusShort(s)` — CSS-класс → русское название статуса
-- `renderSB(rows)` — обновляет счётчики в статусбаре
-- `renderUnsaved()` — показывает/скрывает бейдж "N несохр." и кнопку сохранить всё
-
-### Выделение ячеек
-- `cellClick(ev, rowId)` — клик по ячейке: Ctrl → мультивыбор, обычный → открывает попап; роль-проверка для подрядчика
-- `toggleRow(fl, ev)` — функция существует, но **не вызывается**: `td.rh` (номер этажа) больше не имеет `onclick`; выделение целых строк по клику на этаж удалено
-- `toggleCol(colIdx, ev)` — клик по заголовку работы: выделяет/снимает весь столбец; пропускает чужие строки подрядчика
-- `isRowSelected(fl)` — проверяет, все ли ячейки строки выделены (используется только для CSS-класса)
-- `isColSelected(colIdx)` — проверяет, все ли ячейки столбца выделены
-- `clearSel()` — сбрасывает SEL, обновляет визуал и msbar
-- `updateCellSel()` — синхронизирует CSS-классы sel/row-sel/col-sel с SET SEL
-
-### Пароль администратора
-- `openPwdModal(callback)` — показывает модальное окно ввода пароля
-- `closePwdModal()` — скрывает модальное окно
-- `submitPwd()` — отправляет пароль в GAS checkPassword, при успехе ставит IS_ADMIN=true в sessionStorage
-
-### Мультиредактирование — нижняя панель msbar
-- `updateMsBar()` — показывает/скрывает #msbar (при SEL.size > 1)
-- `resetMsDraft()` — сбрасывает MS_DRAFT и контролы msbar
-- `msDraftStatus(s)` — статус в черновик; автосвязь: done/accepted → 100%
-- `msPctUpd(v)` — слайдер % изменился; автосвязь: 100% → done
-- `msPctResetToggle(checked)` — чекбокс "сбросить %" (блокирует слайдер)
-- `msUpdatePreview()` — обновляет превью тегов в msbar
-- `msCommit()` — применяет MS_DRAFT ко всем ячейкам SEL → MOD; **автодата**: та же логика что в `savePanel()` — ставит сегодня в `dateEnd` если статус окончен/передано и дата не задана
-
-### Попап одиночного редактирования
-- `openPanel(rowId, anchorEl)` — открывает попап: заполняет статус/дату/%/комментарий/подрядчик
-- `positionPopover(anchor)` — позиционирует #popover рядом с anchorEl, не выходя за экран
-- `closePanel()` — скрывает попап, CUR=null
-- `selSt(s)` — выбрать статус; автосвязь: done/accepted → 100%
-- `selStMixed()` — режим "mixed" при разных статусах у выбранных ячеек
-- `updPct(v)` — слайдер % изменился; автосвязь: 100% → done
-- `setPct(v)` — установить % программно
-- `savePanel()` — читает поля попапа → пишет в MOD для всех rowId из SEL (или CUR); **автодата**: если финальный статус `s-done`/`s-accepted` И `MOD[rid].dateEnd` не задана И исходная строка тоже без `dateEnd` → ставит сегодня (`дд.мм.гггг`)
-
-### Сохранение в Google Sheets
-- `updateSaveBtn()` — показывает/скрывает кнопку "Сохранить всё" и бейдж
-- `batchSave(rowIds)` — отправляет изменения из MOD в GAS: ≤20 строк → параллельные saveRow, >20 → saveAll; при нечитаемом ответе показывает предупреждение; при `saved < requested` (saveAll) предупреждает о ненайденных строках
-- `saveAll()` — проверяет AUTHOR, берёт все ключи MOD → batchSave
-
-### Аналитика
-- `toggleAnalytics()` — открывает/закрывает панель `#analytics-panel`; устанавливает `ANALYTICS_OPEN`; при открытии сразу вызывает `renderAnalytics()`
-- `closeAnalytics()` — закрывает панель, сбрасывает `ANALYTICS_OPEN`
-- `renderAnalytics()` — строит таблицу по отфильтрованным строкам (те же фильтры FC/FO/FM/FL1/FL2/FW/FKP/FDATE, без FPLAN7/FPLAN30/FOVERDUE):
-  - Считает по каждой работе: `week` (выполнено за 7д), `month` (за 30д), `total` (всего), `plan` (строк с baseDate ≤ сегодня), `corpora{}` — разбивка по корпусам
-  - Колонки таблицы: **Работа | 7 дн | 30 дн | Факт | План | Откл.**
-  - Откл. = Факт − План; красный если <0, зелёный если >0
-  - Работы сгруппированы по `place` (МОП / Квартира / Этаж / прочее), заголовок группы — `an-grp-hdr`
-  - Клик по строке работы — вызывает `toggleAnDetail(idx)`
-  - Корпуса рендерятся как обычные `<tr class="an-detail an-d-N">`, скрыты по умолчанию
-  - Отчётная дата (сегодня) выводится в `#an-date`
-  - Функция охраняется: `if(!ANALYTICS_OPEN) return;`
-  - **Важно:** `pad()` из `script.gs` недоступен в браузере — используется локальная `p2 = function(n){return n<10?'0'+n:String(n);}` 
-- `toggleAnDetail(idx)` — показывает/скрывает строки `.an-d-N`, переключает стрелку `.an-arrow` ▸/▾
-
-### Утилиты
-- `parseDateMs(s)` — "дд.мм.гггг" → timestamp ms
-- `fmtDateMs(ms)` — timestamp ms → "дд.мм"
-- `fmtDate(d)` — любой формат → "дд.мм.гггг"
-- `toIso(d)` — "дд.мм.гггг" → "гггг-мм-дд"
-- `setSt(st, txt)` — индикатор синхронизации: 'ok'|'err'|'spin'
-- `showLoader(txt)` / `hideLoader()` — оверлей загрузки
-- `toast(msg, tp, dur)` — уведомление: tp='ok'|'err'|'inf'
-- `e(s)` — HTML-экранирование строки
-
-### Ключевые ID элементов DOM
-- `#board` — таблица шахматки
-- `#empty` — заглушка "нет данных"
-- `#popover` — попап одиночного редактирования
-- `#pwd-overlay` — модальное окно пароля
-- `#msbar` — нижняя панель мультиредактирования
-- `#fc` — контейнер чипов корпусов
-- `#forg` / `#fplace` / `#flvl1` / `#flvl2` — select-фильтры
-- `#foverdue` / `#fplan7` / `#fplan30` — чекбоксы «Просрочено», «План на 7 дней», «План на 30 дней»
-- `#work-search-inp` / `#work-drop` / `#work-tags` — поле+дропдаун+теги работ
-- `#filter-tags-bar` / `#filter-tags-list` — бар активных тегов фильтров
-- `#preset-chips` — контейнер чипов пресетов (включая неудаляемый «Без фильтров»)
-- `#pct-sl` / `#pct-val` — слайдер % в попапе
-- `#ms-pct-sl` / `#ms-pct-val` / `#ms-pct-reset` — слайдер % в msbar
-- `#ms-date` / `#ms-contractor` — дата и подрядчик в msbar
-- `#ms-preview` — превью изменений в msbar
-- `#p-date` / `#p-comment` / `#p-contractor` — поля попапа
-- `#sb-total` / `#sb-done` / `#sb-left` / `#sb-start` / `#sb-rem` — счётчики статусбара
-- `#ubadge` / `#save-all-btn` — бейдж несохранённых и кнопка сохранить всё
-- `#author-inp` — поле имени автора (в topbar, рядом с кнопкой аналитики)
-- `#an-btn` — кнопка «📊 Аналитика» в topbar (`.btn-pri` когда панель открыта)
-- `#analytics-panel` — боковая панель аналитики (`.an-panel`, класс `.on` = открыта)
-- `#an-date` — отчётная дата в шапке панели аналитики
-- `#an-sub` — подзаголовок панели (не используется сейчас, очищается)
-- `#an-body` — тело панели аналитики (innerHTML = таблица)
-- `#sdot` / `#stxt` — индикатор синхронизации
-- `#loader` / `#loader-txt` — оверлей загрузки
-- `#toasts` — контейнер уведомлений
-- `#zoom-wrap` / `#zoom-val` — зум-обёртка и отображение %
