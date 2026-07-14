@@ -651,6 +651,7 @@ function sendProtocol(body) {
   var date    = String(body.date || '').trim();
   var title   = String(body.title || 'Протокол').trim();
   var content = String(body.content || '');
+  var preamble = String(body.preamble || '').trim();
   var sections = body.sections || [];
 
   var sheet = ensureProtocolsSheet_();
@@ -665,7 +666,8 @@ function sendProtocol(body) {
     'p{margin:4px 0;line-height:1.5;}' +
     '</style></head><body>' +
     '<h1>' + escHtml_(title) + '</h1>' +
-    '<div class="meta">№ ' + escHtml_(num) + ' от ' + escHtml_(date) + '</div>';
+    '<div class="meta">№ ' + escHtml_(num) + ' от ' + escHtml_(date) + '</div>' +
+    (preamble ? '<p>' + escHtml_(preamble) + '</p>' : '');
   sections.forEach(function(sec) {
     html += '<h2>' + escHtml_(sec.org) + '</h2>';
     (sec.items || []).forEach(function(it) { html += '<p>— ' + escHtml_(it) + '</p>'; });

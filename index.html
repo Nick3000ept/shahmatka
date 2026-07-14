@@ -148,6 +148,7 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .proto-title{font-size:16px;font-weight:700;color:#111;text-align:center;outline:none;}
 .proto-meta{font-size:12px;color:#333;text-align:center;}
 .proto-meta span{outline:none;padding:0 2px;min-width:20px;display:inline-block;}
+.proto-preamble{font-size:12px;color:#111;margin-top:12px;line-height:1.5;outline:none;}
 #proto-doc [contenteditable]:hover{background:#f5f8ff;border-radius:3px;}
 #proto-doc [contenteditable]:focus{background:#eef4ff;border-radius:3px;}
 .proto-org{font-size:13px;font-weight:700;color:#111;margin-top:14px;border-bottom:1px solid #bbb;padding-bottom:3px;}
@@ -178,6 +179,7 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
   body.printing #print-area{display:block!important;}
   #print-area .p-title{font-size:18px;font-weight:700;text-align:center;margin-bottom:4px;}
   #print-area .p-meta{text-align:center;font-size:12px;margin-bottom:18px;}
+  #print-area .p-preamble{font-size:12px;margin:0 0 6px;line-height:1.5;}
   #print-area .p-org{font-size:13px;font-weight:700;margin:16px 0 5px;border-bottom:1px solid #000;padding-bottom:2px;}
   #print-area .p-item{font-size:12px;margin:4px 0;line-height:1.5;}
 }
@@ -772,6 +774,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <div id="proto-doc">
       <div class="proto-title" contenteditable="true" id="proto-title">Протокол совещания по строительству СБ3</div>
       <div class="proto-meta">№ <span id="proto-num" contenteditable="true"></span> от <span id="proto-date" contenteditable="true"></span></div>
+      <div class="proto-preamble" contenteditable="true" id="proto-preamble">На совещании подрядчиками были обозначены следующие сроки выполнения работ:</div>
       <div id="proto-secs"></div>
     </div>
   </div>
@@ -2506,12 +2509,14 @@ function renderAutoTasks(){
 // ── Предпросмотр протокола (редактируемый) ────────────────────────
 // Состав: план на 7 дней из графика + открытые ручные поручения, по подрядчикам.
 // Правки живут только в предпросмотре; при печати текст сохраняется в лист «Протоколы».
-// PROTO_EXCLUDE: эти подрядчики не попадают ни в документ протокола, ни в рассылку
-// (решение 2026-07-08: Альфа Строй, Овчинников, Смирнов, Джамал)
-var PROTO_EXCLUDE=['альфа строй','овчинников','смирнов','джамал'];
+// PROTO_INCLUDE: в протокол и рассылку попадают ТОЛЬКО эти подрядчики
+// (решение 2026-07-14: Топ ИД и Глобал; ранее был чёрный список PROTO_EXCLUDE).
+// Ручные поручения без подрядчика остаются в «Общих поручениях».
+var PROTO_INCLUDE=['топ ид','глобал'];
 function isProtoExcluded(org){
   var low=String(org||'').toLowerCase();
-  return PROTO_EXCLUDE.some(function(x){return low.indexOf(x)>=0;});
+  if(!low) return false; // поручение без подрядчика — общее, не отсекаем
+  return !PROTO_INCLUDE.some(function(x){return low.indexOf(x)>=0;});
 }
 function protoItemHtml(text){
   return '<div class="proto-item"><span class="pi-text" contenteditable="true">'+e(text)+'</span>'+
@@ -2544,6 +2549,7 @@ function openProtoPreview(){
     html+='<button class="btn pi-add" onclick="protoAddItem(this)">+ строка</button></div>';
   });
   document.getElementById('proto-secs').innerHTML=html;
+  document.getElementById('proto-preamble').textContent='На совещании подрядчиками были обозначены следующие сроки выполнения работ:';
   document.getElementById('proto-num').textContent='';
   var d=new Date();
   document.getElementById('proto-date').textContent=
@@ -2563,6 +2569,7 @@ function serializeProto(){
   var title=document.getElementById('proto-title').textContent.trim();
   var num=document.getElementById('proto-num').textContent.trim();
   var date=document.getElementById('proto-date').textContent.trim();
+  var preamble=document.getElementById('proto-preamble').textContent.trim();
   var sections=[];
   document.querySelectorAll('#proto-secs .proto-sec').forEach(function(sec){
     var org=sec.querySelector('.proto-org').textContent.trim();
@@ -2573,10 +2580,10 @@ function serializeProto(){
     });
     if(org&&items.length) sections.push({org:org,items:items});
   });
-  var text=sections.map(function(s){
+  var text=(preamble?preamble+'\n\n':'')+sections.map(function(s){
     return s.org+'\n'+s.items.map(function(i){return '— '+i;}).join('\n');
   }).join('\n\n');
-  return {title:title,num:num,date:date,sections:sections,text:text};
+  return {title:title,num:num,date:date,preamble:preamble,sections:sections,text:text};
 }
 // Печать НЕ сохраняет протокол в таблицу — запись в лист «Протоколы»
 // происходит только при отправке (sendProtocol). Решение 2026-07-08.
@@ -2586,7 +2593,8 @@ function printProtocol(){
   // Собираем печатную версию и открываем диалог печати
   var pa=document.getElementById('print-area');
   var html='<div class="p-title">'+e(s.title)+'</div>'+
-    '<div class="p-meta">'+(s.num?'№ '+e(s.num)+' ':'')+'от '+e(s.date)+'</div>';
+    '<div class="p-meta">'+(s.num?'№ '+e(s.num)+' ':'')+'от '+e(s.date)+'</div>'+
+    (s.preamble?'<div class="p-preamble">'+e(s.preamble)+'</div>':'');
   s.sections.forEach(function(sec){
     html+='<div class="p-org">'+e(sec.org)+'</div>';
     sec.items.forEach(function(i){ html+='<div class="p-item">— '+e(i)+'</div>'; });
@@ -2667,7 +2675,7 @@ async function sendProtocolMail(){
   try{
     var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
       action:'sendProtocol', pwd:ADMIN_PWD, num:s.num, date:s.date, title:s.title,
-      content:s.text, sections:s.sections, recipients:recs, author:AUTHOR
+      preamble:s.preamble, content:s.text, sections:s.sections, recipients:recs, author:AUTHOR
     })});
     var j=JSON.parse(await r.text());
     if(j.error) throw new Error(j.error);
