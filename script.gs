@@ -212,6 +212,16 @@ function doPost(e) {
       return jsonOut(sendProtocol(body));
     }
 
+    // Разовая настройка Telegram: токен бота и id чата пишутся в Script Properties
+    // (в коде секретов нет — репозиторий публичный)
+    if (body.action === 'setTgConfig') {
+      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      var props = PropertiesService.getScriptProperties();
+      if (body.token)  props.setProperty('TG_BOT_TOKEN', String(body.token).trim());
+      if (body.chatId) props.setProperty('TG_CHAT_ID', String(body.chatId).trim());
+      return jsonOut({ok: true, tokenSet: !!props.getProperty('TG_BOT_TOKEN'), chatSet: !!props.getProperty('TG_CHAT_ID')});
+    }
+
     return jsonOut({error: 'Unknown action: ' + body.action});
   } catch (err) {
     return jsonOut({error: err.toString()});
@@ -646,7 +656,8 @@ function escHtml_(s) {
 // шлёт каждому получателю отдельное письмо через MailApp (отправитель — аккаунт GAS)
 function sendProtocol(body) {
   var recipients = body.recipients || [];
-  if (!recipients.length) return {error: 'Нет получателей'};
+  var toTg = body.tg === true; // дублировать протокол в Telegram-чат
+  if (!recipients.length && !toTg) return {error: 'Нет получателей'};
   var num     = String(body.num || '').trim();
   var date    = String(body.date || '').trim();
   var title   = String(body.title || 'Протокол').trim();
@@ -696,8 +707,28 @@ function sendProtocol(body) {
     } catch (e) { errors.push(nm + ': ' + e); }
   });
 
+  // Отправка в Telegram-чат: тот же PDF через Bot API sendDocument.
+  // Токен и id чата — в Script Properties (TG_BOT_TOKEN / TG_CHAT_ID), настройка через action=setTgConfig
+  var tgSent = false, tgError = '';
+  if (toTg) {
+    try {
+      var tgProps = PropertiesService.getScriptProperties();
+      var tgToken = tgProps.getProperty('TG_BOT_TOKEN');
+      var tgChat  = tgProps.getProperty('TG_CHAT_ID');
+      if (!tgToken || !tgChat) throw new Error('Telegram не настроен (нет TG_BOT_TOKEN/TG_CHAT_ID)');
+      var tgResp = UrlFetchApp.fetch('https://api.telegram.org/bot' + tgToken + '/sendDocument', {
+        method: 'post',
+        payload: {chat_id: tgChat, document: pdf, caption: title + ' № ' + num + ' от ' + date},
+        muteHttpExceptions: true
+      });
+      var tgJson = JSON.parse(tgResp.getContentText());
+      if (!tgJson.ok) throw new Error(tgJson.description || 'ошибка Telegram API');
+      tgSent = true;
+    } catch (te) { tgError = String(te.message || te); }
+  }
+
   // Фиксируем в листе «Протоколы»: обновляем строку с этим № или добавляем новую
-  var sentStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy HH:mm') + ' → ' + sent.join(', ');
+  var sentStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy HH:mm') + ' → ' + sent.join(', ') + (tgSent ? (sent.length ? ', ' : '') + 'Telegram-чат' : '');
   var lastRow = sheet.getLastRow(), found = -1;
   if (lastRow >= 2) {
     var nums = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
@@ -712,7 +743,7 @@ function sendProtocol(body) {
     sheet.appendRow([safeCell_(num), safeCell_(date), safeCell_(body.author), safeContent.slice(0, 45000), sentStr]);
   }
   SpreadsheetApp.flush();
-  return {ok: true, num: num, sent: sent, errors: errors};
+  return {ok: true, num: num, sent: sent, errors: errors, tgSent: tgSent, tgError: tgError};
 }
 
 function saveProtocol(body) {

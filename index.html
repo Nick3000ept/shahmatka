@@ -804,6 +804,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
       <input type="email" id="send-manual" placeholder="Добавить адрес вручную…" style="flex:1;padding:7px 10px;border:1px solid var(--brd2);border-radius:var(--r);font-size:12px;outline:none;color:var(--ink);" onkeydown="if(event.key==='Enter')sendAddManual()">
       <button class="btn" onclick="sendAddManual()">+ Добавить</button>
     </div>
+    <label class="send-row" id="send-tg-row"><input type="checkbox" checked id="send-tg"><b>📨 Telegram-чат</b> — отправить PDF в группу ботом</label>
     <div class="proto-toolbar">
       <button class="btn btn-pri" id="send-btn" onclick="sendProtocolMail()">📧 Отправить</button>
     </div>
@@ -2639,6 +2640,7 @@ async function openSendModal(){
   // Сброс после возможного прошлого отчёта об отправке
   document.getElementById('send-btn').style.display='';
   document.getElementById('send-manual-row').style.display='';
+  document.getElementById('send-tg-row').style.display='';
   document.getElementById('send-overlay').classList.add('on');
 }
 function closeSendModal(){ document.getElementById('send-overlay').classList.remove('on'); }
@@ -2668,14 +2670,15 @@ async function sendProtocolMail(){
   document.querySelectorAll('#send-list input[type=checkbox]:checked').forEach(function(cb){
     recs.push({name:cb.dataset.name,email:cb.dataset.email});
   });
-  if(!recs.length){ toast('Не выбраны получатели','inf'); return; }
+  var toTg=document.getElementById('send-tg').checked;
+  if(!recs.length&&!toTg){ toast('Не выбраны получатели','inf'); return; }
   var btn=document.getElementById('send-btn');
   btn.disabled=true;
   setSt('spin','Отправка протокола…');
   try{
     var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
       action:'sendProtocol', pwd:ADMIN_PWD, num:s.num, date:s.date, title:s.title,
-      preamble:s.preamble, content:s.text, sections:s.sections, recipients:recs, author:AUTHOR
+      preamble:s.preamble, content:s.text, sections:s.sections, recipients:recs, author:AUTHOR, tg:toTg
     })});
     var j=JSON.parse(await r.text());
     if(j.error) throw new Error(j.error);
@@ -2687,6 +2690,11 @@ async function sendProtocolMail(){
       rep+='<div style="font-size:13px;font-weight:700;color:var(--green);">✅ Письма отправлены ('+okN+')</div>';
       (j.sent||[]).forEach(function(em){ rep+='<div class="send-row">📧 '+e(em)+'</div>'; });
     }
+    if(j.tgSent){
+      rep+='<div class="send-row">📨 Telegram-чат — отправлено</div>';
+    }else if(toTg){
+      rep+='<div class="send-row" style="border-color:var(--red);">📨 Telegram: '+e(j.tgError||'не отправлено')+'</div>';
+    }
     if(j.errors&&j.errors.length){
       rep+='<div style="font-size:12px;font-weight:700;color:var(--red);margin-top:6px;">Не отправлено:</div>';
       j.errors.forEach(function(er){ rep+='<div class="send-row" style="border-color:var(--red);">'+e(er)+'</div>'; });
@@ -2695,6 +2703,7 @@ async function sendProtocolMail(){
     document.getElementById('send-list').innerHTML=rep;
     document.getElementById('send-btn').style.display='none';
     document.getElementById('send-manual-row').style.display='none';
+    document.getElementById('send-tg-row').style.display='none';
     if(j.errors&&j.errors.length){ setSt('err','Отправлено частично'); }
     else { setSt('ok','Протокол отправлен'); }
   }catch(ex){
