@@ -212,6 +212,12 @@ function doPost(e) {
       return jsonOut(sendProtocol(body));
     }
 
+    // Текстовое уведомление в Telegram-чат (запрос актуализации данных и т.п.)
+    if (body.action === 'sendTgNotify') {
+      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      return jsonOut(sendTgNotify(body));
+    }
+
     // Разовая настройка Telegram: токен бота и id чата пишутся в Script Properties
     // (в коде секретов нет — репозиторий публичный)
     if (body.action === 'setTgConfig') {
@@ -744,6 +750,36 @@ function sendProtocol(body) {
   }
   SpreadsheetApp.flush();
   return {ok: true, num: num, sent: sent, errors: errors, tgSent: tgSent, tgError: tgError};
+}
+
+// Текстовое сообщение в Telegram-чат (токен и id чата — в Script Properties).
+// Сообщение длиннее лимита Telegram (4096) режется по строкам на части ~3500 символов.
+function sendTgNotify(body) {
+  var text = String(body.text || '').trim();
+  if (!text) return {error: 'Пустое сообщение'};
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty('TG_BOT_TOKEN');
+  var chat  = props.getProperty('TG_CHAT_ID');
+  if (!token || !chat) return {error: 'Telegram не настроен (нет TG_BOT_TOKEN/TG_CHAT_ID)'};
+
+  var chunks = [], cur = '';
+  text.split('\n').forEach(function(line) {
+    if ((cur + '\n' + line).length > 3500) { chunks.push(cur); cur = line; }
+    else cur = cur ? cur + '\n' + line : line;
+  });
+  if (cur) chunks.push(cur);
+
+  for (var i = 0; i < chunks.length; i++) {
+    var resp = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({chat_id: chat, text: chunks[i]}),
+      muteHttpExceptions: true
+    });
+    var j = JSON.parse(resp.getContentText());
+    if (!j.ok) return {error: 'Telegram: ' + (j.description || 'ошибка отправки'), parts: i};
+  }
+  return {ok: true, parts: chunks.length};
 }
 
 function saveProtocol(body) {

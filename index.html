@@ -241,6 +241,8 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .an-foot{background:var(--bg3)!important;font-weight:700;border-top:2px solid var(--brd2)!important;}
 .an-foot td{border-bottom:none!important;}
 .an-empty{padding:48px 24px;text-align:center;color:var(--ink3);font-size:12px;}
+/* ── NOTIF PANEL ── */
+.notif-corp{font-size:11px;font-weight:700;color:var(--ink2);margin:7px 0 2px;}
 
 /* ── HINT BAR ── */
 
@@ -530,6 +532,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <div class="sep"></div>
     <button class="btn" id="an-btn" onclick="toggleAnalytics()" style="font-size:11px;">📊 Аналитика</button>
     <button class="btn admin-only" id="prot-btn" onclick="toggleProt()" style="font-size:11px;">📋 Протокол</button>
+    <button class="btn admin-only" id="notif-btn" onclick="toggleNotif()" style="font-size:11px;">🔔 Уведомления</button>
   </div>
 </div>
 
@@ -760,6 +763,24 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <div class="prot-open" id="prot-open"><div class="tasks-empty">Загрузка…</div></div>
     <div class="prot-open-title">Из графика — план на 7 дней</div>
     <div class="prot-auto" id="prot-auto"></div>
+  </div>
+</div>
+
+<!-- ПАНЕЛЬ УВЕДОМЛЕНИЙ (справа) -->
+<div id="notif-panel" class="prot-panel">
+  <div class="an-head">
+    <div>
+      <div class="an-title">🔔 Уведомления</div>
+      <div class="an-sub">Работы с ручной датой окончания, у которых срок прошёл, а СМР не окончены и не приняты. Группировка: подрядчик → корпус.</div>
+    </div>
+    <button class="btn" onclick="closeNotif()" style="padding:3px 9px;font-size:12px;flex-shrink:0;">✕</button>
+  </div>
+  <div class="prot-body">
+    <div class="prot-open-title">Уведомления на актуализацию</div>
+    <div class="prot-auto" id="notif-overdue"></div>
+    <div class="prot-actions">
+      <button class="btn btn-pri" id="notif-send-btn" onclick="sendNotifTg()">📨 Запрос актуализации в Telegram-чат</button>
+    </div>
   </div>
 </div>
 
@@ -2330,7 +2351,7 @@ function openProt(){
   // Нужен сохранённый пароль админа для защищённых запросов.
   // Если сессия «админ», но пароль не сохранён (старый вход) — просим ввести заново.
   if(!ADMIN_PWD){ openPwdModal(openProt); return; }
-  closeAnalytics();
+  closeAnalytics(); closeNotif();
   PROT_OPEN=true;
   document.getElementById('prot-panel').classList.add('on');
   document.getElementById('prot-btn').classList.add('btn-pri');
@@ -2342,6 +2363,106 @@ function closeProt(){
   PROT_OPEN=false;
   document.getElementById('prot-panel').classList.remove('on');
   document.getElementById('prot-btn').classList.remove('btn-pri');
+}
+
+// ─── УВЕДОМЛЕНИЯ (панель справа) ──────────────────────────────────
+// Блок «Уведомления на актуализацию»: работы с ручной датой окончания (dateEnd, столбец I),
+// у которых срок прошёл (dateEnd < сегодня), а статус не «СМР окончены» и не «На площадке» (принято).
+// Группировка: подрядчик → корпус → работа+срок (этажи списком).
+var NOTIF_OPEN=false;
+function toggleNotif(){ NOTIF_OPEN?closeNotif():openNotif(); }
+function openNotif(){
+  if(!ADMIN_PWD){ openPwdModal(openNotif); return; }
+  closeAnalytics(); closeProt();
+  NOTIF_OPEN=true;
+  document.getElementById('notif-panel').classList.add('on');
+  document.getElementById('notif-btn').classList.add('btn-pri');
+  renderNotif();
+}
+function closeNotif(){
+  NOTIF_OPEN=false;
+  document.getElementById('notif-panel').classList.remove('on');
+  document.getElementById('notif-btn').classList.remove('btn-pri');
+}
+function collectOverdue(){
+  var byOrg={};
+  ROWS.forEach(function(r){
+    if(!r.org||!r.dateEnd) return;
+    var st=S2CSS[r.status||'']||'s-empty';
+    if(st==='s-done'||st==='s-onsite') return;
+    var ms=parseDateMs(fmtDate(r.dateEnd));
+    if(!ms||ms>=TODAY_MS) return; // только просроченные
+    var corp=r.corpus||'—';
+    var key=r.work+'|'+ms;
+    if(!byOrg[r.org]) byOrg[r.org]={};
+    if(!byOrg[r.org][corp]) byOrg[r.org][corp]={};
+    if(!byOrg[r.org][corp][key]) byOrg[r.org][corp][key]={work:r.work,dueMs:ms,due:fmtDate(r.dateEnd),floors:[]};
+    byOrg[r.org][corp][key].floors.push(r.floor);
+  });
+  return byOrg;
+}
+function renderNotif(){
+  var box=document.getElementById('notif-overdue');
+  var byOrg=collectOverdue();
+  var orgs=Object.keys(byOrg).sort();
+  if(!orgs.length){
+    box.innerHTML='<div class="tasks-empty">Просроченных сроков нет — всё актуально 🎉</div>';
+    document.getElementById('notif-send-btn').style.display='none';
+    return;
+  }
+  document.getElementById('notif-send-btn').style.display='';
+  var html='';
+  orgs.forEach(function(org){
+    html+='<div class="pa-org">'+e(org)+'</div>';
+    Object.keys(byOrg[org]).sort().forEach(function(corp){
+      html+='<div class="notif-corp">'+e(corp)+'</div>';
+      Object.values(byOrg[org][corp]).sort(function(a,b){return a.dueMs-b.dueMs;}).forEach(function(it){
+        html+='<div class="pa-item pa-plan">'+e(it.work)+': эт. '+e(floorsCompact(it.floors))
+          +' — <span class="pa-due">срок '+e(it.due)+'</span></div>';
+      });
+    });
+  });
+  box.innerHTML=html;
+}
+// Текст запроса для Telegram — тот же состав, что на экране
+function notifTgText(){
+  var byOrg=collectOverdue();
+  var orgs=Object.keys(byOrg).sort();
+  if(!orgs.length) return '';
+  var lines=['⚠️ Запрос на актуализацию данных — шахматка СБ3','',
+    'По следующим работам срок окончания прошёл, а СМР не завершены. Просьба обновить статусы и даты:',''];
+  orgs.forEach(function(org){
+    lines.push('🔸 '+org);
+    Object.keys(byOrg[org]).sort().forEach(function(corp){
+      Object.values(byOrg[org][corp]).sort(function(a,b){return a.dueMs-b.dueMs;}).forEach(function(it){
+        lines.push('• '+corp+': '+it.work+', эт. '+floorsCompact(it.floors)+' — срок '+it.due);
+      });
+    });
+    lines.push('');
+  });
+  lines.push('Шахматка: https://nick3000ept.github.io/shahmatka/');
+  return lines.join('\n');
+}
+async function sendNotifTg(){
+  if(!ADMIN_PWD){ openPwdModal(sendNotifTg); return; }
+  var text=notifTgText();
+  if(!text){ toast('Просроченных сроков нет','inf'); return; }
+  var btn=document.getElementById('notif-send-btn');
+  btn.disabled=true;
+  setSt('spin','Отправка в Telegram…');
+  try{
+    var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+      action:'sendTgNotify', pwd:ADMIN_PWD, text:text
+    })});
+    var j=JSON.parse(await r.text());
+    if(j.error) throw new Error(j.error);
+    setSt('ok','Отправлено');
+    toast('Запрос отправлен в чат «Шахматка сб3»'+(j.parts>1?' ('+j.parts+' сообщения)':''),'ok');
+  }catch(ex){
+    setSt('err','Ошибка');
+    toast('Не отправлено: '+ex.message,'err',6000);
+  }
+  btn.disabled=false;
 }
 
 // Опции подрядчиков для <select>
@@ -2769,6 +2890,7 @@ var ANALYTICS_OPEN=false;
 function toggleAnalytics(){
   ANALYTICS_OPEN=!ANALYTICS_OPEN;
   if(ANALYTICS_OPEN&&typeof closeProt==='function') closeProt();
+  if(ANALYTICS_OPEN&&typeof closeNotif==='function') closeNotif();
   document.getElementById('analytics-panel').classList.toggle('on',ANALYTICS_OPEN);
   document.getElementById('an-btn').classList.toggle('btn-pri',ANALYTICS_OPEN);
   if(ANALYTICS_OPEN){
