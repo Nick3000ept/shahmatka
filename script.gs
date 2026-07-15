@@ -654,6 +654,20 @@ function testMailAuth() {
   MailApp.sendEmail(Session.getEffectiveUser().getEmail(), 'Тест почты СБ3', 'Авторизация MailApp работает.');
 }
 
+// Разовый тест авторизации внешних запросов (UrlFetchApp → Telegram):
+// запустить в редакторе GAS, принять права → в чат придёт сообщение «Авторизация ОК»
+function testTgAuth() {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty('TG_BOT_TOKEN');
+  var chat  = props.getProperty('TG_CHAT_ID');
+  var resp = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({chat_id: chat, text: '✅ Авторизация ОК: скрипт шахматки может отправлять в Telegram.'})
+  });
+  Logger.log(resp.getContentText());
+}
+
 function escHtml_(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

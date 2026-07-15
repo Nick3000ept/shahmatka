@@ -791,7 +791,22 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <div class="prot-open-title">Уведомления на актуализацию</div>
     <div class="prot-auto" id="notif-overdue"></div>
     <div class="prot-actions">
-      <button class="btn btn-pri" id="notif-send-btn" onclick="sendNotifTg()">📨 Запрос актуализации в Telegram-чат</button>
+      <button class="btn btn-pri" id="notif-send-btn" onclick="openNotifSend()">📨 Запрос актуализации в Telegram-чат</button>
+    </div>
+  </div>
+</div>
+
+<!-- ВЫБОР ПОДРЯДЧИКОВ ДЛЯ ЗАПРОСА АКТУАЛИЗАЦИИ -->
+<div class="proto-overlay" id="notif-send-overlay" style="z-index:620;">
+  <div class="proto-page" style="width:min(480px,94vw);">
+    <div class="proto-toolbar">
+      <button class="btn" onclick="closeNotifSend()">✕ Закрыть</button>
+    </div>
+    <div class="proto-title" style="font-size:14px;">Кому отправить запрос актуализации</div>
+    <div style="font-size:11px;color:var(--ink3);text-align:center;">Снимите галочку, чтобы не включать подрядчика. Сообщение уйдёт в Telegram-чат «Шахматка сб3».</div>
+    <div id="notif-send-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+    <div class="proto-toolbar">
+      <button class="btn btn-pri" id="notif-send-go" onclick="sendNotifTg()">📨 Отправить</button>
     </div>
   </div>
 </div>
@@ -2408,8 +2423,9 @@ function collectOverdue(){
     var key=r.work+'|'+ms;
     if(!byOrg[r.org]) byOrg[r.org]={};
     if(!byOrg[r.org][corp]) byOrg[r.org][corp]={};
-    if(!byOrg[r.org][corp][key]) byOrg[r.org][corp][key]={work:r.work,dueMs:ms,due:fmtDate(r.dateEnd),floors:[]};
+    if(!byOrg[r.org][corp][key]) byOrg[r.org][corp][key]={work:r.work,dueMs:ms,due:fmtDate(r.dateEnd),floors:[],authors:{}};
     byOrg[r.org][corp][key].floors.push(r.floor);
+    if(r.author) byOrg[r.org][corp][key].authors[r.author]=1; // кто вносил срок
   });
   return byOrg;
 }
@@ -2429,17 +2445,36 @@ function renderNotif(){
     Object.keys(byOrg[org]).sort().forEach(function(corp){
       html+='<div class="notif-corp">'+e(corp)+'</div>';
       Object.values(byOrg[org][corp]).sort(function(a,b){return a.dueMs-b.dueMs;}).forEach(function(it){
+        var authors=Object.keys(it.authors);
         html+='<div class="pa-item pa-plan">'+e(it.work)+': эт. '+e(floorsCompact(it.floors))
-          +' — <span class="pa-due">срок '+e(it.due)+'</span></div>';
+          +' — <span class="pa-due">срок '+e(it.due)+'</span>'
+          +(authors.length?' <span style="font-size:10px;color:var(--ink3);">· внёс: '+e(authors.join(', '))+'</span>':'')
+          +'</div>';
       });
     });
   });
   box.innerHTML=html;
 }
-// Текст запроса для Telegram — тот же состав, что на экране
-function notifTgText(){
+// Окно выбора подрядчиков перед отправкой запроса
+function openNotifSend(){
+  if(!ADMIN_PWD){ openPwdModal(openNotifSend); return; }
   var byOrg=collectOverdue();
   var orgs=Object.keys(byOrg).sort();
+  if(!orgs.length){ toast('Просроченных сроков нет','inf'); return; }
+  var rows='';
+  orgs.forEach(function(org){
+    var n=0;
+    Object.keys(byOrg[org]).forEach(function(corp){ n+=Object.keys(byOrg[org][corp]).length; });
+    rows+='<label class="send-row"><input type="checkbox" checked data-org="'+e(org)+'"><b>'+e(org)+'</b> — позиций: '+n+'</label>';
+  });
+  document.getElementById('notif-send-list').innerHTML=rows;
+  document.getElementById('notif-send-overlay').classList.add('on');
+}
+function closeNotifSend(){ document.getElementById('notif-send-overlay').classList.remove('on'); }
+// Текст запроса для Telegram — тот же состав, что на экране; selOrgs — Set выбранных подрядчиков
+function notifTgText(selOrgs){
+  var byOrg=collectOverdue();
+  var orgs=Object.keys(byOrg).filter(function(o){return !selOrgs||selOrgs.has(o);}).sort();
   if(!orgs.length) return '';
   var lines=['⚠️ Запрос на актуализацию данных — шахматка СБ3','',
     'По следующим работам срок окончания прошёл, а СМР не завершены. Просьба обновить статусы и даты:',''];
@@ -2447,7 +2482,9 @@ function notifTgText(){
     lines.push('🔸 '+org);
     Object.keys(byOrg[org]).sort().forEach(function(corp){
       Object.values(byOrg[org][corp]).sort(function(a,b){return a.dueMs-b.dueMs;}).forEach(function(it){
-        lines.push('• '+corp+': '+it.work+', эт. '+floorsCompact(it.floors)+' — срок '+it.due);
+        var authors=Object.keys(it.authors);
+        lines.push('• '+corp+': '+it.work+', эт. '+floorsCompact(it.floors)+' — срок '+it.due
+          +(authors.length?' (внёс: '+authors.join(', ')+')':''));
       });
     });
     lines.push('');
@@ -2457,9 +2494,14 @@ function notifTgText(){
 }
 async function sendNotifTg(){
   if(!ADMIN_PWD){ openPwdModal(sendNotifTg); return; }
-  var text=notifTgText();
+  var selOrgs=new Set();
+  document.querySelectorAll('#notif-send-list input[type=checkbox]:checked').forEach(function(cb){
+    selOrgs.add(cb.dataset.org);
+  });
+  if(!selOrgs.size){ toast('Не выбран ни один подрядчик','inf'); return; }
+  var text=notifTgText(selOrgs);
   if(!text){ toast('Просроченных сроков нет','inf'); return; }
-  var btn=document.getElementById('notif-send-btn');
+  var btn=document.getElementById('notif-send-go');
   btn.disabled=true;
   setSt('spin','Отправка в Telegram…');
   try{
@@ -2470,6 +2512,7 @@ async function sendNotifTg(){
     if(j.error) throw new Error(j.error);
     setSt('ok','Отправлено');
     toast('Запрос отправлен в чат «Шахматка сб3»'+(j.parts>1?' ('+j.parts+' сообщения)':''),'ok');
+    closeNotifSend();
   }catch(ex){
     setSt('err','Ошибка');
     toast('Не отправлено: '+ex.message,'err',6000);

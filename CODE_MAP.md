@@ -160,10 +160,11 @@
 ### Уведомления — панель справа (admin-only)
 - `NOTIF_OPEN` — bool, панель уведомлений открыта
 - `toggleNotif()` / `openNotif()` / `closeNotif()` — открытие/закрытие `#notif-panel` (пароль админа обязателен; закрывает панели аналитики и поручений, и наоборот)
-- `collectOverdue()` — просроченные строки: `dateEnd` (ручная, столбец I) < сегодня, статус не `s-done`/`s-onsite`; возвращает `{org: {corpus: {work|ms: {work,due,dueMs,floors[]}}}}`
-- `renderNotif()` — рисует блок «Уведомления на актуализацию» в `#notif-overdue` (подрядчик → корпус → работы)
-- `notifTgText()` — собирает текст запроса актуализации для Telegram из тех же данных
-- `sendNotifTg()` — POST `sendTgNotify` на бэк → сообщение в чат «Шахматка сб3»
+- `collectOverdue()` — просроченные строки: `dateEnd` (ручная, столбец I) < сегодня, статус не `s-done`/`s-onsite`; возвращает `{org: {corpus: {work|ms: {work,due,dueMs,floors[],authors{}}}}}`
+- `renderNotif()` — рисует блок «Уведомления на актуализацию» в `#notif-overdue` (подрядчик → корпус → работы, с автором срока)
+- `openNotifSend()` / `closeNotifSend()` — окно выбора подрядчиков `#notif-send-overlay` перед отправкой (галочки, все включены)
+- `notifTgText(selOrgs)` — текст запроса для Telegram по выбранным подрядчикам (Set; без аргумента — все)
+- `sendNotifTg()` — читает галочки из `#notif-send-list` → POST `sendTgNotify` → сообщение в чат «Шахматка сб3»
 
 ### Утилиты
 - `parseDateMs(s)` — "дд.мм.гггг" → timestamp ms
@@ -199,7 +200,8 @@
 - `#notif-btn` — кнопка «🔔 Уведомления» в topbar (admin-only)
 - `#notif-panel` — панель уведомлений справа (класс `.prot-panel`, `.on` = открыта)
 - `#notif-overdue` — блок «Уведомления на актуализацию»
-- `#notif-send-btn` — кнопка отправки запроса в Telegram
+- `#notif-send-btn` — кнопка открытия окна выбора подрядчиков
+- `#notif-send-overlay` / `#notif-send-list` / `#notif-send-go` — окно выбора подрядчиков и кнопка отправки
 - `#analytics-panel` — боковая панель аналитики (`.an-panel`, класс `.on` = открыта)
 - `#an-date` — отчётная дата в шапке панели аналитики
 - `#an-sub` — подзаголовок панели (не используется сейчас, очищается)
