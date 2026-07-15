@@ -1490,14 +1490,16 @@ function render(){
   });
   var hasExtra1=COL_KEYS.some(c=>c.extra1);
 
-  // Считаем макс базовую дату по каждой колонке и по каждому корпусу — O(n)
+  // Считаем макс ТЕКУЩУЮ дату окончания (currentDate, столбец Q) по каждой колонке
+  // и по каждому корпусу — O(n); если текущей нет — берём базовую (baseDate)
   var _colKeyLookup={};
   COL_KEYS.forEach(c=>{ _colKeyLookup[c.corpus+'|'+(c.place||'')+'|'+(c.lvl2||'')+'|'+c.work+'|'+(c.extra1||'')]=c.key; });
   var maxDateByCol={};
   var maxDateByCorpus={};
   rows.forEach(r=>{
-    if(!r.baseDate) return;
-    var d=parseDateMs(r.baseDate);
+    var src=r.currentDate||r.baseDate;
+    if(!src) return;
+    var d=parseDateMs(fmtDate(src));
     if(!d) return;
     var ck=_colKeyLookup[r.corpus+'|'+(r.place||'')+'|'+(r.lvl2||'')+'|'+r.work+'|'+(r.extra1||'')];
     if(ck&&(!maxDateByCol[ck]||d>maxDateByCol[ck])) maxDateByCol[ck]=d;
