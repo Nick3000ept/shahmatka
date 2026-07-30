@@ -3192,6 +3192,7 @@ function buildPivotHtml(){
     if(FL2&&r.lvl2!==FL2) return false;
     if(FW.size>0&&!FW.has(r.work)) return false;
     if(FKP&&!r.kp) return false;
+    if(FSTATUS.size>0){var _fstP=MOD[r.rowId]&&MOD[r.rowId].status!==undefined?MOD[r.rowId].status:(S2CSS[r.status||'']||'s-empty');if(!FSTATUS.has(_fstP))return false;}
     return true;
   });
   if(!rows.length) return '<div class="tasks-empty">Нет строк с текущей датой окончания (по активным фильтрам)</div>';
