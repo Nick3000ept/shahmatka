@@ -573,8 +573,17 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
       onfocus="showWorkDrop()">
     <div class="work-drop" id="work-drop" style="display:none" onmousedown="event.stopPropagation()"></div>
   </div>
-  <!-- Чипы фильтра по статусам убраны (2026-07-15). Логика FSTATUS оставлена:
-       старые пресеты со статусами продолжают работать, фильтр виден плашкой-тегом и снимается там. -->
+  <div class="fsep"></div>
+  <span class="fl">Статус:</span>
+  <select class="fsel" id="fstatus-sel" onchange="fstatusSelChange(this.value)">
+    <option value="">Все</option>
+    <option value="s-empty">Без статуса</option>
+    <option value="s-started">Начаты</option>
+    <option value="s-done">Окончены</option>
+    <option value="s-front">Фронт открыт</option>
+    <option value="s-remarks">Замечания</option>
+    <option value="s-onsite">На площадке</option>
+  </select>
 </div>
 
 <!-- FILTER TAGS BAR -->
@@ -1177,6 +1186,24 @@ function syncFStatusChips(){
   document.querySelectorAll('#fstatus-chips .chip').forEach(function(ch){
     ch.classList.toggle('on', FSTATUS.has(ch.dataset.st));
   });
+  syncFStatusSelect();
+}
+// Отражает FSTATUS в выпадающем списке: ровно один статус — показываем его,
+// иначе (пусто или несколько из пресета) — «Все».
+function syncFStatusSelect(){
+  var sel=document.getElementById('fstatus-sel');
+  if(!sel) return;
+  sel.value = FSTATUS.size===1 ? [...FSTATUS][0] : '';
+}
+// Выбор статуса в выпадающем списке. FSTATUS используется как множество,
+// но список позволяет выбрать один статус (или «Все» — снять фильтр).
+function fstatusSelChange(v){
+  FSTATUS.clear();
+  if(v) FSTATUS.add(v);
+  ACTIVE_PRESET=null;
+  renderPresetChips();
+  renderFilterTags();
+  render();
 }
 
 function applyFiltersAndTags(){
