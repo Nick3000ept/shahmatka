@@ -1455,6 +1455,10 @@ function render(){
   var board=document.getElementById('board');
   var empty=document.getElementById('empty');
 
+  // Если открыта «Сводная» — перестраиваем её на лету при любой смене фильтров
+  var _pivOv=document.getElementById('pivot-overlay');
+  if(_pivOv&&_pivOv.classList.contains('on')) document.getElementById('pivot-body').innerHTML=buildPivotHtml();
+
   var fdateMs=FDATE?new Date(FDATE).getTime():0;
   var rows=ROWS.filter(r=>{
     if(FC.size>0&&!FC.has(r.corpus)) return false;
