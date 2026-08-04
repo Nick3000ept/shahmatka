@@ -113,11 +113,6 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .prot-row{display:flex;gap:8px;align-items:stretch;}
 .prot-text{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:8px;font-size:12px;outline:none;color:var(--ink);background:var(--bg);font-family:inherit;resize:vertical;min-height:46px;}
 .prot-text:focus{border-color:var(--acc);}
-.prot-side{display:flex;flex-direction:column;gap:5px;width:150px;flex-shrink:0;}
-.prot-org{padding:6px 8px;border:1px solid var(--brd2);border-radius:14px;font-size:11px;outline:none;color:var(--acc);background:var(--bg3);font-weight:600;cursor:pointer;}
-.prot-org:focus{border-color:var(--acc);}
-.prot-date{padding:5px 8px;border:1px solid var(--brd2);border-radius:8px;font-size:11px;outline:none;color:var(--ink);background:var(--bg2);font-family:inherit;}
-.prot-date:focus{border-color:var(--acc);}
 .prot-main{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0;}
 .prot-comm{box-sizing:border-box;padding:6px 10px;border:1px solid var(--brd2);border-radius:8px;font-size:11px;outline:none;color:var(--ink);background:var(--bg2);font-family:inherit;}
 .prot-comm:focus{border-color:var(--acc);}
@@ -784,7 +779,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <div class="prot-rows admin-only" id="prot-rows"></div>
     <div class="prot-actions admin-only">
       <button class="btn" onclick="openProtoPreview()">📄 Сформировать протокол</button>
-      <button class="btn btn-pri" onclick="saveProtTasks()">💾 Сохранить поручения</button>
+      <button class="btn btn-pri" onclick="saveProtTasks()">＋ Добавить</button>
     </div>
     <div class="prot-open-title">Открытые поручения</div>
     <div class="prot-open" id="prot-open"><div class="tasks-empty">Загрузка…</div></div>
@@ -2556,23 +2551,15 @@ async function sendNotifTg(){
   btn.disabled=false;
 }
 
-// Опции подрядчиков для <select>
-function protOrgOptions(){
-  return '<option value="">— подрядчик —</option>'+
-    CONTRACTORS.map(function(c){ return '<option value="'+e(c)+'">'+e(c)+'</option>'; }).join('');
-}
-// Одна пустая строка ввода поручения
+// Одна форма ввода: Тема + Описание (переработка 2026-08-04 — без даты и подрядчика,
+// без автодобавления строк: написал → «Добавить» → форма очистилась под следующее)
 function makeProtRow(){
   var row=document.createElement('div');
   row.className='prot-row';
   row.innerHTML=
     '<div class="prot-main">'+
-      '<textarea class="prot-text" placeholder="Текст поручения…" oninput="protRowInput(this)"></textarea>'+
-      '<input class="prot-comm" placeholder="Комментарий (попадёт в протокол)">'+
-    '</div>'+
-    '<div class="prot-side">'+
-      '<select class="prot-org">'+protOrgOptions()+'</select>'+
-      '<input type="date" class="prot-date">'+
+      '<textarea class="prot-text" placeholder="Тема"></textarea>'+
+      '<input class="prot-comm" placeholder="Описание">'+
     '</div>';
   return row;
 }
@@ -2580,15 +2567,6 @@ function resetProtRows(){
   var box=document.getElementById('prot-rows');
   box.innerHTML='';
   box.appendChild(makeProtRow());
-}
-// При вводе в последнюю строку — добавляем новую пустую ниже
-function protRowInput(el){
-  var box=document.getElementById('prot-rows');
-  var rows=box.querySelectorAll('.prot-row');
-  var last=rows[rows.length-1];
-  if(el.closest('.prot-row')===last && el.value.trim()!==''){
-    box.appendChild(makeProtRow());
-  }
 }
 
 function cacheTasks(){ try{ localStorage.setItem('sb3_tasks', JSON.stringify(TASKS)); }catch(e){} }
@@ -2624,7 +2602,7 @@ function taskItemHtml(t, isDone){
   else right=hi?'<span class="ti-pri-badge">🔺 Высокий</span>':'';
   return '<div class="task-item'+(isDone?' done':'')+(hi?' hi':'')+'" data-tid="'+e(t.id)+'">'+
     '<div class="ti-main">'+
-      '<div class="ti-org">'+e(t.org)+'</div>'+
+      (t.org?'<div class="ti-org">'+e(t.org)+'</div>':'')+
       '<div class="ti-text">'+e(t.text)+'</div>'+
       '<div class="ti-meta">'+(t.due?'Срок: '+e(t.due)+' · ':'')+'создано '+e(t.created)+(t.author?' · '+e(t.author):'')+'</div>'+
       comm+
@@ -2679,33 +2657,37 @@ async function toggleDoneList(){
     renderTasksList();
   }
 }
-// Сохраняем все заполненные строки поручений
+// «Добавить»: поручение сразу появляется в списке (optimistic UI), форма очищается
+// под следующее, запрос уходит фоном; при ошибке — поручение убирается, текст возвращается в форму.
 async function saveProtTasks(){
   if(!ADMIN_PWD){ openPwdModal(saveProtTasks); return; }
-  var rows=document.querySelectorAll('#prot-rows .prot-row');
-  var toSave=[];
-  for(var i=0;i<rows.length;i++){
-    var text=rows[i].querySelector('.prot-text').value.trim();
-    var org=rows[i].querySelector('.prot-org').value.trim();
-    var due=rows[i].querySelector('.prot-date').value;
-    var comm=rows[i].querySelector('.prot-comm').value.trim();
-    if(!text) continue;                 // пустые строки пропускаем
-    if(!org){ toast('Выберите подрядчика для поручения','err'); rows[i].querySelector('.prot-org').focus(); return; }
-    toSave.push({org:org, text:text, due:due?fmtDate(due):'', comment:comm});
-  }
-  if(!toSave.length){ toast('Нет заполненных поручений','inf'); return; }
-  setSt('spin','Сохранение поручений…');
+  var row=document.querySelector('#prot-rows .prot-row');
+  var text=row.querySelector('.prot-text').value.trim();
+  var comm=row.querySelector('.prot-comm').value.trim();
+  if(!text){ toast('Впишите тему поручения','inf'); row.querySelector('.prot-text').focus(); return; }
+  var p2=function(n){return n<10?'0'+n:String(n);};
+  var d=new Date();
+  var temp={id:'tmp'+Date.now(), org:'', text:text, due:'', status:'открыто',
+    created:p2(d.getDate())+'.'+p2(d.getMonth()+1)+'.'+d.getFullYear(), author:AUTHOR, comment:comm, priority:''};
+  TASKS.push(temp);
+  renderTasksList();
+  resetProtRows();
+  document.querySelector('#prot-rows .prot-text').focus();
   try{
-    // Весь пакет одним запросом (addTasks): записывается либо всё, либо ничего
     var j=await fetchJson(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
-      action:'addTasks', pwd:ADMIN_PWD, author:AUTHOR, tasks:toSave
+      action:'addTasks', pwd:ADMIN_PWD, author:AUTHOR, tasks:[{org:'', text:text, due:'', comment:comm}]
     })});
     if(j.error){ throw new Error(j.error); }
-    setSt('ok','Готово');
-    toast('Сохранено поручений: '+(j.added||toSave.length),'ok');
-    resetProtRows();
-    loadTasks();
-  }catch(ex){ setSt('err','Ошибка'); toast('Ошибка сохранения: '+ex.message,'err'); }
+    loadTasks(); // фоновое обновление подменит временную запись настоящей (с серверным id)
+  }catch(ex){
+    TASKS=TASKS.filter(function(x){return x.id!==temp.id;});
+    cacheTasks();
+    renderTasksList();
+    var f=document.querySelector('#prot-rows .prot-row');
+    f.querySelector('.prot-text').value=text;
+    f.querySelector('.prot-comm').value=comm;
+    toast('Не удалось добавить поручение: '+ex.message,'err');
+  }
 }
 // ── Автопоручения из графика ──
 // Правила (2026-07-08): дата — только ручная dateEnd (столбец I);
@@ -2957,6 +2939,7 @@ async function sendProtocolMail(){
 
 async function markTaskDone(id){
   if(!ADMIN_PWD){ openPwdModal(function(){markTaskDone(id);}); return; }
+  if(id.indexOf('tmp')===0){ toast('Поручение ещё сохраняется — секунду','inf'); return; }
   try{
     var j=await fetchJson(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
       action:'updateTask', pwd:ADMIN_PWD, id:id, status:'выполнено'
@@ -2977,6 +2960,7 @@ async function markTaskDone(id){
 
 // Комментарий к поручению: сохраняется при уходе из поля (onchange)
 async function saveTaskComment(id, val){
+  if(id.indexOf('tmp')===0){ toast('Поручение ещё сохраняется — секунду','inf'); return; }
   val=String(val).trim();
   var t=TASKS.find(function(t){return t.id===id;});
   if(t&&String(t.comment||'').trim()===val) return; // не изменился — не дёргаем бэк
@@ -2996,6 +2980,7 @@ async function saveTaskComment(id, val){
 // Optimistic UI: список меняется сразу, запрос уходит фоном; ошибка — откат с предупреждением.
 async function toggleTaskPriority(id){
   if(!ADMIN_PWD){ openPwdModal(function(){toggleTaskPriority(id);}); return; }
+  if(id.indexOf('tmp')===0){ toast('Поручение ещё сохраняется — секунду','inf'); return; }
   var t=TASKS.find(function(x){return x.id===id;});
   if(!t) return;
   var oldPri=t.priority||'';

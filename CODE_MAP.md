@@ -169,8 +169,8 @@
 ### Поручения / Протокол — панель справа (кнопка «📋 Протокол»; видна всем, управление — админу)
 - Не-админ: только чтение списка поручений (`openProt` без пароля; форма `#prot-rows` и `.prot-actions` скрыты классом `admin-only`; в `taskItemHtml` поле комментария и кнопка «Выполнено» рисуются только при `IS_ADMIN`)
 - `TASKS[]` — ОТКРЫТЫЕ поручения из листа «Поручения» (`{id,org,text,due,status,created,author,comment}`); `DONE_TASKS[]` — выполненные (`null` = ещё не загружены); `DONE_OPEN` — блок «Выполнено» раскрыт; `PROT_OPEN` — панель открыта
-- `makeProtRow()` / `resetProtRows()` / `protRowInput(el)` — строки ввода нового поручения в `#prot-rows`: текст (`.prot-text`) + комментарий (`.prot-comm`) слева, подрядчик (`.prot-org`) + срок (`.prot-date`) справа; ввод в последнюю строку добавляет новую пустую
-- `saveProtTasks()` — сохраняет заполненные строки пакетом → один POST `addTasks` (org/text/due/comment), через fetchJson с ретраями
+- `makeProtRow()` / `resetProtRows()` — одна форма ввода в `#prot-rows`: «Тема» (`.prot-text`) + «Описание» (`.prot-comm`); даты и подрядчика нет (2026-08-04)
+- `saveProtTasks()` — кнопка «＋ Добавить»: optimistic UI (временная запись `tmp…` сразу в списке, форма очищается), фоном POST `addTasks` с одним поручением (org пустой), `loadTasks` подменяет запись; ошибка — откат и возврат текста в форму
 - `cacheTasks()` — пишет TASKS в localStorage `sb3_tasks`
 - `loadTasks()` — мгновенно рисует список из кэша localStorage, свежие ОТКРЫТЫЕ тянет фоном (`getTasks` без all=1)
 - `renderTasksList()` / `taskItemHtml(t,isDone)` — список поручений в `#prot-open`: открытые + блок «Выполнено»; у открытых — редактируемое поле комментария (`.ti-comm`, onchange → `saveTaskComment`), у выполненных комментарий только для чтения (`.ti-comm-ro`, 💬)

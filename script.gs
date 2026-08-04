@@ -592,9 +592,9 @@ function getTasks(includeAll) {
 }
 
 function addTask(body) {
-  var org  = String(body.org || '').trim();
+  var org  = String(body.org || '').trim();  // необязателен с 2026-08-04 (форма «Тема+Описание»)
   var text = String(body.text || '').trim();
-  if (!org || !text) return {error: 'Укажите подрядчика и текст поручения'};
+  if (!text) return {error: 'Укажите текст поручения'};
   var sheet = ensureTasksSheet_();
   var id = 't' + Date.now() + Math.floor(Math.random() * 1000);
   var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy');
@@ -613,9 +613,9 @@ function addTasks(body) {
   var rowsOut = [];
   for (var i = 0; i < list.length; i++) {
     var t = list[i] || {};
-    var org  = String(t.org || '').trim();
+    var org  = String(t.org || '').trim();  // необязателен с 2026-08-04 (форма «Тема+Описание»)
     var text = String(t.text || '').trim();
-    if (!org || !text) return {error: 'У каждого поручения нужны подрядчик и текст (строка ' + (i + 1) + ')'};
+    if (!text) return {error: 'У каждого поручения нужен текст (строка ' + (i + 1) + ')'};
     var id = 't' + Date.now() + i + Math.floor(Math.random() * 1000);
     rowsOut.push([id, safeCell_(org), safeCell_(text), safeCell_(t.due), 'открыто', nowStr, safeCell_(body.author), safeCell_(t.comment)]);
   }
