@@ -44,6 +44,7 @@
 - `renderContractorSelect(selected)` — обновляет `<select#p-contractor>` в попапе
 - `reload()` — вызывает loadData()
 - `loadData()` — главная загрузка: fetch getRows → ROWS → buildFilters() → render()
+- `loadFlats()` — чекбокс «Квартиры» (`SHOW_FLATS`/`FLATS`, 2026-08-04): лениво грузит `getFlats` (лист «Квартиры» → счётчики отделки по корпусу+этажу); в ячейках MR Base (серый) / Shell+стяжка (фиолетовый #8b5cf6) / Shell (красный), дельта и прогресс-бар скрыты
 
 ### Фильтры
 - `buildFilters()` — строит чипы корпусов + select орг/место/вид работ/группа работ + список работ из ROWS

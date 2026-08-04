@@ -624,6 +624,10 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     Показать ЧЛ
   </label>
   <label class="chk-lbl">
+    <input type="checkbox" id="fflats" onchange="SHOW_FLATS=this.checked;if(SHOW_FLATS)loadFlats();else render();">
+    Квартиры
+  </label>
+  <label class="chk-lbl">
     <input type="checkbox" id="foverdue" onchange="FOVERDUE=this.checked;render();">
     Просрочено
   </label>
@@ -923,6 +927,7 @@ var FLOOR_ROW_MAP = new Map(); // floor → [rowId], перестраивает�
 var ROWS_MAP = new Map();    // rowId → row object, перестраивается при loadData()
 
 var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, FPROTOCOL=false, SHOW_CL=false, SHOW_EMPTY=false;
+var SHOW_FLATS=false, FLATS=null; // чекбокс «Квартиры»: счётчики по отделке из листа «Квартиры» (null = ещё не загружены)
 var CHECK_LISTS=[], CL_MAP={}, STAFFING_DATA=[], STAFF_OPEN=false;
 var WORKS=[];
 
@@ -1751,7 +1756,17 @@ function render(){
       if(SHOW_CL&&row.idFact){var _clk=row.corpus+'|||'+String(row.floor)+'|||'+row.idFact;_clItems=dedupeClItems(CL_MAP[_clk]||[]);}
       var _clTot=_clItems.length,_clRem=_clItems.filter(function(i){return (i.status||'').toLowerCase().indexOf('замеч')>=0;}).length,_clAcc=_clItems.filter(function(i){return (i.status||'').toLowerCase().indexOf('принят')>=0;}).length;
       var cellContent;
-      if(SHOW_CL){
+      if(SHOW_FLATS&&!SHOW_CL){
+        // «Квартиры»: счётчики по отделке для этажа+корпуса (MR Base / Shell+стяжка / Shell)
+        var _flNum=parseFloat(String(row.floor).replace(',','.'));
+        var _fc=(FLATS&&FLATS[row.corpus])?FLATS[row.corpus][_flNum]:null;
+        cellContent=!_fc?''
+          :'<div style="font-family:var(--mono);font-size:13px;font-weight:800;text-align:center;width:100%;line-height:1.6;letter-spacing:-.5px;">'
+            +'<span style="color:var(--ink3)" title="MR Base">'+_fc[0]+'</span>'
+            +' / <span style="color:#8b5cf6" title="Shell and Core + стяжка">'+_fc[1]+'</span>'
+            +' / <span style="color:var(--red)" title="Shell and Core">'+_fc[2]+'</span>'
+            +'</div>';
+      } else if(SHOW_CL){
         cellContent=(!row.idFact||_clTot===0)
           ?''
           :'<div style="font-family:var(--mono);font-size:14px;font-weight:800;text-align:center;width:100%;line-height:1.6;letter-spacing:-.5px;">'
@@ -1782,9 +1797,9 @@ function render(){
       h+='<td class="cell '+s+(isNewC?' gs':isNewP?' gp':'')+(isMod?' modified':'')+(isSel?' sel':'')+(isFloorSep?' floor-sep':'')+(isNotMine?' not-mine':'')+'" data-rid="'+e(rowId)+'" onclick="cellClick(event,\''+e(rowId)+'\')">'
         +'<div class="ci">'
         +'<div class="c-row">'+cellContent+'</div>'
-        +(!SHOW_SP&&!SHOW_CL?diffHtml:'')
+        +(!SHOW_SP&&!SHOW_CL&&!SHOW_FLATS?diffHtml:'')
         +'</div>'
-        +(pctNum>0&&!SHOW_CL?'<div class="c-bar"><div class="c-bar-fill" style="width:'+pctNum+'%"></div></div>':'')
+        +(pctNum>0&&!SHOW_CL&&!SHOW_FLATS?'<div class="c-bar"><div class="c-bar-fill" style="width:'+pctNum+'%"></div></div>':'')
         +'</td>';
     });
     h+='</tr>';
@@ -3365,6 +3380,26 @@ function togglePvDetail(idx){
   var show=rows.length&&rows[0].style.display!=='table-row';
   rows.forEach(function(tr){tr.style.display=show?'table-row':'none';});
   if(arrow) arrow.textContent=show?'▾':'▸';
+}
+
+// ─── КВАРТИРЫ ─────────────────────────────────────────────────────
+// Чекбокс «Квартиры»: счётчики по отделке из листа «Квартиры».
+// Грузится лениво при первом включении, дальше — из памяти страницы.
+async function loadFlats(){
+  if(FLATS){render();return;}
+  setSt('spin','Загрузка квартир…');
+  try{
+    var j=await fetchJson(BASE+'?action=getFlats&t='+Date.now());
+    FLATS=j.flats||{};
+    setSt('ok','');
+    render();
+  }catch(ex){
+    setSt('err','');
+    toast('Ошибка загрузки квартир','err');
+    SHOW_FLATS=false;
+    var cb=document.getElementById('fflats');
+    if(cb) cb.checked=false;
+  }
 }
 
 // ─── ЧЕК-ЛИСТЫ ────────────────────────────────────────────────────

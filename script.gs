@@ -67,6 +67,7 @@ function doGet(e) {
     if (action === 'getCheckLists') return jsonOut(getCheckLists());
     if (action === 'getStaffing')   return jsonOut(getStaffing());
     if (action === 'getTasks')      return jsonOut(getTasks(p.all === '1'));
+    if (action === 'getFlats')      return jsonOut(getFlats());
     if (action === 'getContractorEmails') return jsonOut(getContractorEmails());
 
 
@@ -545,6 +546,39 @@ function getCheckLists() {
   var result = {items: items};
   try { cache.put('sb3_checklists', JSON.stringify(result), 7200); } catch(e) {}
   return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// КВАРТИРЫ (лист «Квартиры», 2026-08-04) — счётчики квартир по уровню отделки.
+// Столбцы: A=Корпус (число) | B=Этаж (число) | C=Номер квартиры | D=Корпус (текст) |
+// E=Площадь | F=Статус (MR Base / Shell and Core + стяжка / Shell and Core).
+// Ответ: { flats: { 'К1': { '46': [mrBase, shellСтяжка, shell] } } } — только агрегат.
+// Статусы сверяются по вхождению без регистра — устойчиво к вариантам написания.
+// ═══════════════════════════════════════════════════════════════════
+function getFlats() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName('Квартиры');
+  if (!sh) return {flats: {}};
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return {flats: {}};
+  var vals = sh.getRange(2, 1, lastRow - 1, 6).getValues();
+  var out = {};
+  vals.forEach(function (r) {
+    var corp = parseInt(r[0], 10);
+    var floor = parseFloat(r[1]);
+    var st = String(r[5]).trim().toLowerCase();
+    if (!corp || isNaN(floor) || !st) return;
+    var cat;
+    if (st.indexOf('mr base') >= 0) cat = 0;                                 // серый
+    else if (st.indexOf('shell') >= 0 && st.indexOf('стяж') >= 0) cat = 1;   // фиолетовый
+    else if (st.indexOf('shell') >= 0) cat = 2;                              // красный
+    else return;                                                             // прочие статусы не считаем
+    var key = 'К' + corp;
+    if (!out[key]) out[key] = {};
+    if (!out[key][floor]) out[key][floor] = [0, 0, 0];
+    out[key][floor][cat]++;
+  });
+  return {flats: out};
 }
 
 // ═══════════════════════════════════════════════════════════════════
