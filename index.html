@@ -551,7 +551,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <input class="url-input" id="author-inp" placeholder="Ваше имя…" style="width:130px;" oninput="saveAuthor(this.value)">
     <div class="sep"></div>
     <button class="btn" id="an-btn" onclick="toggleAnalytics()" style="font-size:11px;">📊 Аналитика</button>
-    <button class="btn admin-only" id="prot-btn" onclick="toggleProt()" style="font-size:11px;">📋 Протокол</button>
+    <button class="btn" id="prot-btn" onclick="toggleProt()" style="font-size:11px;">📋 Протокол</button>
     <button class="btn admin-only" id="notif-btn" onclick="toggleNotif()" style="font-size:11px;">🔔 Уведомления</button>
   </div>
 </div>
@@ -774,15 +774,14 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <button class="btn" onclick="closeProt()" style="padding:3px 9px;font-size:12px;flex-shrink:0;">✕</button>
   </div>
   <div class="prot-body">
-    <div class="prot-rows" id="prot-rows"></div>
-    <div class="prot-actions">
+    <!-- Создание поручений и формирование протокола — только админ; список ниже видят все -->
+    <div class="prot-rows admin-only" id="prot-rows"></div>
+    <div class="prot-actions admin-only">
       <button class="btn" onclick="openProtoPreview()">📄 Сформировать протокол</button>
       <button class="btn btn-pri" onclick="saveProtTasks()">💾 Сохранить поручения</button>
     </div>
     <div class="prot-open-title">Открытые поручения</div>
     <div class="prot-open" id="prot-open"><div class="tasks-empty">Загрузка…</div></div>
-    <div class="prot-open-title">Из графика — план на 7 дней</div>
-    <div class="prot-auto" id="prot-auto"></div>
   </div>
 </div>
 
@@ -2406,16 +2405,16 @@ var TASKS=[], DONE_TASKS=null, DONE_OPEN=false, PROT_OPEN=false;
 // TASKS — только открытые поручения; DONE_TASKS — выполненные, null = ещё не загружены (грузятся по клику)
 function toggleProt(){ PROT_OPEN?closeProt():openProt(); }
 function openProt(){
-  // Нужен сохранённый пароль админа для защищённых запросов.
-  // Если сессия «админ», но пароль не сохранён (старый вход) — просим ввести заново.
-  if(!ADMIN_PWD){ openPwdModal(openProt); return; }
+  // Панель доступна всем; не-админ видит только список ручных поручений (просмотр).
+  // Админу нужен сохранённый пароль для защищённых POST-запросов: если сессия «админ»,
+  // но пароль не сохранён (старый вход) — просим ввести заново.
+  if(IS_ADMIN && !ADMIN_PWD){ openPwdModal(openProt); return; }
   closeAnalytics(); closeNotif();
   PROT_OPEN=true;
   document.getElementById('prot-panel').classList.add('on');
   document.getElementById('prot-btn').classList.add('btn-pri');
-  resetProtRows();
+  if(IS_ADMIN) resetProtRows();
   loadTasks();
-  renderAutoTasks();
 }
 function closeProt(){
   PROT_OPEN=false;
@@ -2605,17 +2604,20 @@ async function loadTasks(){
   }
 }
 function taskItemHtml(t, isDone){
+  // Не-админ видит поручения только для чтения: без правки комментария и кнопки «Выполнено»
+  var comm=(IS_ADMIN&&!isDone)
+    ?'<input class="ti-comm" placeholder="+ комментарий (попадёт в протокол)" value="'+e(t.comment||'')+'" onchange="saveTaskComment(\''+e(t.id)+'\',this.value)">'
+    :(t.comment?'<div class="ti-comm-ro">💬 '+e(t.comment)+'</div>':'');
+  var right=isDone
+    ?'<span style="font-size:10px;color:var(--ink3);flex-shrink:0;">✓</span>'
+    :(IS_ADMIN?'<button class="btn" onclick="markTaskDone(\''+e(t.id)+'\')">✓ Выполнено</button>':'');
   return '<div class="task-item'+(isDone?' done':'')+'" data-tid="'+e(t.id)+'">'+
     '<div class="ti-main">'+
       '<div class="ti-org">'+e(t.org)+'</div>'+
       '<div class="ti-text">'+e(t.text)+'</div>'+
       '<div class="ti-meta">'+(t.due?'Срок: '+e(t.due)+' · ':'')+'создано '+e(t.created)+(t.author?' · '+e(t.author):'')+'</div>'+
-      (isDone
-        ?(t.comment?'<div class="ti-comm-ro">💬 '+e(t.comment)+'</div>':'')
-        :'<input class="ti-comm" placeholder="+ комментарий (попадёт в протокол)" value="'+e(t.comment||'')+'" onchange="saveTaskComment(\''+e(t.id)+'\',this.value)">')+
-    '</div>'+
-    (isDone?'<span style="font-size:10px;color:var(--ink3);flex-shrink:0;">✓</span>':
-      '<button class="btn" onclick="markTaskDone(\''+e(t.id)+'\')">✓ Выполнено</button>')+
+      comm+
+    '</div>'+right+
   '</div>';
 }
 function renderTasksList(){
@@ -2722,26 +2724,8 @@ function collectAutoTasks(){
   });
   return byOrg;
 }
-function renderAutoTasks(){
-  var box=document.getElementById('prot-auto');
-  var byOrg=collectAutoTasks();
-  var orgs=Object.keys(byOrg).sort();
-  if(!orgs.length){ box.innerHTML='<div class="tasks-empty">Нет работ с ручной датой окончания на ближайшие 7 дней</div>'; return; }
-  var html='';
-  orgs.forEach(function(org){
-    var items=Object.values(byOrg[org]).sort(function(a,b){return a.dueMs-b.dueMs;});
-    html+='<div class="pa-org">'+e(org)+'</div>';
-    items.forEach(function(it){
-      var authors=Object.keys(it.authors);
-      html+='<div class="pa-item pa-plan">'
-        +e(it.work)+', '+e(it.corpus)+': эт. '+e(floorsCompact(it.floors))
-        +' — <span class="pa-due">срок '+e(it.due)+'</span>'
-        +(authors.length?' <span style="font-size:10px;color:var(--ink3);">· поставил: '+e(authors.join(', '))+'</span>':'')
-        +'</div>';
-    });
-  });
-  box.innerHTML=html;
-}
+// Блок «Из графика — план на 7 дней» убран из панели (решение пользователя 2026-08-04).
+// collectAutoTasks/floorsCompact остались — их использует формирование протокола.
 
 // ── Предпросмотр протокола (редактируемый) ────────────────────────
 // Состав: план на 7 дней из графика + открытые ручные поручения, по подрядчикам.

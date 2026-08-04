@@ -166,7 +166,8 @@
 - `notifTgText(selOrgs)` — текст запроса для Telegram по выбранным подрядчикам (Set; без аргумента — все)
 - `sendNotifTg()` — читает галочки из `#notif-send-list` → POST `sendTgNotify` → сообщение в чат «Шахматка сб3»
 
-### Поручения / Протокол — панель справа (admin-only, кнопка «📋 Протокол»)
+### Поручения / Протокол — панель справа (кнопка «📋 Протокол»; видна всем, управление — админу)
+- Не-админ: только чтение списка поручений (`openProt` без пароля; форма `#prot-rows` и `.prot-actions` скрыты классом `admin-only`; в `taskItemHtml` поле комментария и кнопка «Выполнено» рисуются только при `IS_ADMIN`)
 - `TASKS[]` — ОТКРЫТЫЕ поручения из листа «Поручения» (`{id,org,text,due,status,created,author,comment}`); `DONE_TASKS[]` — выполненные (`null` = ещё не загружены); `DONE_OPEN` — блок «Выполнено» раскрыт; `PROT_OPEN` — панель открыта
 - `makeProtRow()` / `resetProtRows()` / `protRowInput(el)` — строки ввода нового поручения в `#prot-rows`: текст (`.prot-text`) + комментарий (`.prot-comm`) слева, подрядчик (`.prot-org`) + срок (`.prot-date`) справа; ввод в последнюю строку добавляет новую пустую
 - `saveProtTasks()` — сохраняет заполненные строки пакетом → один POST `addTasks` (org/text/due/comment), через fetchJson с ретраями
@@ -176,7 +177,7 @@
 - `toggleDoneList()` — раскрытие «Выполнено»; при первом раскрытии грузит `getTasks&all=1`, заполняет DONE_TASKS (и заодно обновляет TASKS)
 - `markTaskDone(id)` — POST `updateTask` статус «выполнено»; локально переносит из TASKS в DONE_TASKS
 - `saveTaskComment(id,val)` — POST `updateTask` с комментарием; локально обновляет `TASKS`, бэк не дёргает, если текст не изменился
-- `collectAutoTasks()` / `renderAutoTasks()` / `floorsCompact(floors)` — авто-блок «Из графика — план на 7 дней» в `#prot-auto`
+- `collectAutoTasks()` / `floorsCompact(floors)` — сбор «плана на 7 дней» для формирования протокола (блок «Из графика» из панели убран 2026-08-04, `renderAutoTasks` удалена)
 - `PROTO_INCLUDE` / `isProtoExcluded(org)` — белый список подрядчиков протокола (Топ ИД, Глобал)
 - `openProtoPreview()` — предпросмотр протокола `#proto-overlay`: «Общие поручения» (текст + срок + комментарий в скобках), затем секции подрядчиков из графика
 
