@@ -544,7 +544,7 @@ function getCheckLists() {
 
 // ═══════════════════════════════════════════════════════════════════
 // ПОРУЧЕНИЯ (лист «Поручения») — ручные задачи для протокола
-// Столбцы: A=id | B=Подрядчик | C=Текст | D=Срок | E=Статус | F=Создано | G=Автор
+// Столбцы: A=id | B=Подрядчик | C=Текст | D=Срок | E=Статус | F=Создано | G=Автор | H=Комментарий
 // Статус: 'открыто' | 'выполнено'
 // ═══════════════════════════════════════════════════════════════════
 function ensureTasksSheet_() {
@@ -552,9 +552,10 @@ function ensureTasksSheet_() {
   var sheet = ss.getSheetByName(TASKS_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(TASKS_SHEET);
-    sheet.appendRow(['id', 'Подрядчик', 'Текст', 'Срок', 'Статус', 'Создано', 'Автор']);
+    sheet.appendRow(['id', 'Подрядчик', 'Текст', 'Срок', 'Статус', 'Создано', 'Автор', 'Комментарий']);
     sheet.setFrozenRows(1);
   }
+  if (String(sheet.getRange(1, 8).getValue()) === '') sheet.getRange(1, 8).setValue('Комментарий');
   return sheet;
 }
 
@@ -562,7 +563,7 @@ function getTasks(includeAll) {
   var sheet = ensureTasksSheet_();
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return {tasks: []};
-  var values = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  var values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
   var tasks = [];
   values.forEach(function(row) {
     var id = String(row[0]).trim();
@@ -576,7 +577,8 @@ function getTasks(includeAll) {
       due     : formatDateOut(row[3]),
       status  : status,
       created : formatDateOut(row[5]),
-      author  : String(row[6]).trim()
+      author  : String(row[6]).trim(),
+      comment : String(row[7]).trim()
     });
   });
   return {tasks: tasks};
@@ -589,7 +591,7 @@ function addTask(body) {
   var sheet = ensureTasksSheet_();
   var id = 't' + Date.now() + Math.floor(Math.random() * 1000);
   var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy');
-  sheet.appendRow([id, safeCell_(org), safeCell_(text), safeCell_(body.due), 'открыто', nowStr, safeCell_(body.author)]);
+  sheet.appendRow([id, safeCell_(org), safeCell_(text), safeCell_(body.due), 'открыто', nowStr, safeCell_(body.author), safeCell_(body.comment)]);
   SpreadsheetApp.flush();
   return {ok: true, id: id};
 }
@@ -608,6 +610,7 @@ function updateTask(body) {
       if (body.org    !== undefined) sheet.getRange(r, 2).setValue(safeCell_(body.org));
       if (body.text   !== undefined) sheet.getRange(r, 3).setValue(safeCell_(body.text));
       if (body.due    !== undefined) sheet.getRange(r, 4).setValue(safeCell_(body.due));
+      if (body.comment !== undefined) sheet.getRange(r, 8).setValue(safeCell_(body.comment));
       SpreadsheetApp.flush();
       return {ok: true};
     }

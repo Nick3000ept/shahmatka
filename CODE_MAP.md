@@ -166,6 +166,17 @@
 - `notifTgText(selOrgs)` — текст запроса для Telegram по выбранным подрядчикам (Set; без аргумента — все)
 - `sendNotifTg()` — читает галочки из `#notif-send-list` → POST `sendTgNotify` → сообщение в чат «Шахматка сб3»
 
+### Поручения / Протокол — панель справа (admin-only, кнопка «📋 Протокол»)
+- `TASKS[]` — поручения из листа «Поручения» (`{id,org,text,due,status,created,author,comment}`); `PROT_OPEN` — панель открыта
+- `makeProtRow()` / `resetProtRows()` / `protRowInput(el)` — строки ввода нового поручения в `#prot-rows`: текст (`.prot-text`) + комментарий (`.prot-comm`) слева, подрядчик (`.prot-org`) + срок (`.prot-date`) справа; ввод в последнюю строку добавляет новую пустую
+- `saveProtTasks()` — сохраняет заполненные строки → POST `addTask` (org/text/due/comment)
+- `loadTasks()` / `renderTasksList()` / `taskItemHtml(t,isDone)` — список поручений в `#prot-open`: открытые + свёрнутый блок «Выполнено»; у открытых — редактируемое поле комментария (`.ti-comm`, onchange → `saveTaskComment`), у выполненных комментарий только для чтения (`.ti-comm-ro`, 💬)
+- `markTaskDone(id)` — POST `updateTask` статус «выполнено»
+- `saveTaskComment(id,val)` — POST `updateTask` с комментарием; локально обновляет `TASKS`, бэк не дёргает, если текст не изменился
+- `collectAutoTasks()` / `renderAutoTasks()` / `floorsCompact(floors)` — авто-блок «Из графика — план на 7 дней» в `#prot-auto`
+- `PROTO_INCLUDE` / `isProtoExcluded(org)` — белый список подрядчиков протокола (Топ ИД, Глобал)
+- `openProtoPreview()` — предпросмотр протокола `#proto-overlay`: «Общие поручения» (текст + срок + комментарий в скобках), затем секции подрядчиков из графика
+
 ### Утилиты
 - `parseDateMs(s)` — "дд.мм.гггг" → timestamp ms
 - `fmtDateMs(ms)` — timestamp ms → "дд.мм"

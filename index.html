@@ -118,6 +118,9 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .prot-org:focus{border-color:var(--acc);}
 .prot-date{padding:5px 8px;border:1px solid var(--brd2);border-radius:8px;font-size:11px;outline:none;color:var(--ink);background:var(--bg2);font-family:inherit;}
 .prot-date:focus{border-color:var(--acc);}
+.prot-main{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0;}
+.prot-comm{box-sizing:border-box;padding:6px 10px;border:1px solid var(--brd2);border-radius:8px;font-size:11px;outline:none;color:var(--ink);background:var(--bg2);font-family:inherit;}
+.prot-comm:focus{border-color:var(--acc);}
 .prot-actions{display:flex;justify-content:flex-end;padding-top:2px;}
 .prot-open-title{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:12px;padding-top:12px;border-top:1px solid var(--brd);}
 .prot-open{display:flex;flex-direction:column;gap:6px;}
@@ -126,6 +129,9 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .task-item .ti-org{font-size:11px;font-weight:600;color:var(--acc);}
 .task-item .ti-text{font-size:12px;color:var(--ink);margin-top:2px;word-break:break-word;}
 .task-item .ti-meta{font-size:10px;color:var(--ink3);margin-top:3px;}
+.task-item .ti-comm{width:100%;box-sizing:border-box;margin-top:4px;padding:4px 8px;border:1px dashed var(--brd2);border-radius:6px;font-size:11px;color:var(--ink);background:var(--bg2);outline:none;font-family:inherit;}
+.task-item .ti-comm:focus{border-color:var(--acc);border-style:solid;}
+.task-item .ti-comm-ro{font-size:11px;color:var(--ink3);margin-top:3px;font-style:italic;word-break:break-word;}
 .tasks-empty{font-size:12px;color:var(--ink3);text-align:center;padding:16px;}
 .prot-auto{display:flex;flex-direction:column;gap:4px;}
 .pa-org{font-size:11px;font-weight:700;color:var(--acc);margin-top:8px;padding-bottom:3px;border-bottom:1px solid var(--brd);}
@@ -2556,7 +2562,10 @@ function makeProtRow(){
   var row=document.createElement('div');
   row.className='prot-row';
   row.innerHTML=
-    '<textarea class="prot-text" placeholder="Текст поручения…" oninput="protRowInput(this)"></textarea>'+
+    '<div class="prot-main">'+
+      '<textarea class="prot-text" placeholder="Текст поручения…" oninput="protRowInput(this)"></textarea>'+
+      '<input class="prot-comm" placeholder="Комментарий (попадёт в протокол)">'+
+    '</div>'+
     '<div class="prot-side">'+
       '<select class="prot-org">'+protOrgOptions()+'</select>'+
       '<input type="date" class="prot-date">'+
@@ -2596,6 +2605,9 @@ function taskItemHtml(t, isDone){
       '<div class="ti-org">'+e(t.org)+'</div>'+
       '<div class="ti-text">'+e(t.text)+'</div>'+
       '<div class="ti-meta">'+(t.due?'Срок: '+e(t.due)+' · ':'')+'создано '+e(t.created)+(t.author?' · '+e(t.author):'')+'</div>'+
+      (isDone
+        ?(t.comment?'<div class="ti-comm-ro">💬 '+e(t.comment)+'</div>':'')
+        :'<input class="ti-comm" placeholder="+ комментарий (попадёт в протокол)" value="'+e(t.comment||'')+'" onchange="saveTaskComment(\''+e(t.id)+'\',this.value)">')+
     '</div>'+
     (isDone?'<span style="font-size:10px;color:var(--ink3);flex-shrink:0;">✓</span>':
       '<button class="btn" onclick="markTaskDone(\''+e(t.id)+'\')">✓ Выполнено</button>')+
@@ -2631,16 +2643,17 @@ async function saveProtTasks(){
     var text=rows[i].querySelector('.prot-text').value.trim();
     var org=rows[i].querySelector('.prot-org').value.trim();
     var due=rows[i].querySelector('.prot-date').value;
+    var comm=rows[i].querySelector('.prot-comm').value.trim();
     if(!text) continue;                 // пустые строки пропускаем
     if(!org){ toast('Выберите подрядчика для поручения','err'); rows[i].querySelector('.prot-org').focus(); return; }
-    toSave.push({org:org, text:text, due:due?fmtDate(due):''});
+    toSave.push({org:org, text:text, due:due?fmtDate(due):'', comment:comm});
   }
   if(!toSave.length){ toast('Нет заполненных поручений','inf'); return; }
   setSt('spin','Сохранение поручений…');
   try{
     for(var k=0;k<toSave.length;k++){
       var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
-        action:'addTask', pwd:ADMIN_PWD, org:toSave[k].org, text:toSave[k].text, due:toSave[k].due, author:AUTHOR
+        action:'addTask', pwd:ADMIN_PWD, org:toSave[k].org, text:toSave[k].text, due:toSave[k].due, comment:toSave[k].comment, author:AUTHOR
       })});
       var j=JSON.parse(await r.text());
       if(j.error){ throw new Error(j.error); }
@@ -2739,7 +2752,7 @@ function openProtoPreview(){
   if(openTasks.length){
     html+='<div class="proto-sec"><div class="proto-org" contenteditable="true">Общие поручения</div>';
     openTasks.forEach(function(t){
-      html+=protoItemHtml((t.org?t.org+': ':'')+t.text+(t.due?' — срок '+t.due:''));
+      html+=protoItemHtml((t.org?t.org+': ':'')+t.text+(t.due?' — срок '+t.due:'')+(t.comment?' ('+t.comment+')':''));
     });
     html+='<button class="btn pi-add" onclick="protoAddItem(this)">+ строка</button></div>';
   }
@@ -2931,6 +2944,23 @@ async function markTaskDone(id){
     renderTasksList();
     toast('Отмечено выполненным','ok');
   }catch(ex){ toast('Ошибка','err'); }
+}
+
+// Комментарий к поручению: сохраняется при уходе из поля (onchange)
+async function saveTaskComment(id, val){
+  val=String(val).trim();
+  var t=TASKS.find(function(t){return t.id===id;});
+  if(t&&String(t.comment||'').trim()===val) return; // не изменился — не дёргаем бэк
+  if(!ADMIN_PWD){ openPwdModal(function(){saveTaskComment(id, val);}); return; }
+  try{
+    var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+      action:'updateTask', pwd:ADMIN_PWD, id:id, comment:val
+    })});
+    var j=JSON.parse(await r.text());
+    if(j.error){ toast(j.error,'err'); return; }
+    if(t) t.comment=val;
+    toast('Комментарий сохранён','ok');
+  }catch(ex){ toast('Ошибка сохранения комментария','err'); }
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────
