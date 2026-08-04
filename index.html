@@ -111,10 +111,10 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .prot-body{overflow-y:auto;flex:1;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
 .prot-rows{display:flex;flex-direction:column;gap:8px;}
 .prot-row{display:flex;gap:8px;align-items:stretch;}
-.prot-text{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:8px;font-size:12px;outline:none;color:var(--ink);background:var(--bg);font-family:inherit;resize:vertical;min-height:46px;}
+.prot-text{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:8px;font-size:12px;outline:none;color:var(--ink);background:var(--bg);font-family:inherit;}
 .prot-text:focus{border-color:var(--acc);}
 .prot-main{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0;}
-.prot-comm{box-sizing:border-box;padding:6px 10px;border:1px solid var(--brd2);border-radius:8px;font-size:11px;outline:none;color:var(--ink);background:var(--bg2);font-family:inherit;}
+.prot-comm{box-sizing:border-box;padding:6px 10px;border:1px solid var(--brd2);border-radius:8px;font-size:11px;outline:none;color:var(--ink);background:var(--bg2);font-family:inherit;resize:none;overflow:hidden;line-height:1.4;}
 .prot-comm:focus{border-color:var(--acc);}
 .prot-actions{display:flex;justify-content:flex-end;padding-top:2px;}
 .prot-open-title{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:12px;padding-top:12px;border-top:1px solid var(--brd);}
@@ -778,11 +778,13 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <!-- Создание поручений и формирование протокола — только админ; список ниже видят все -->
     <div class="prot-rows admin-only" id="prot-rows"></div>
     <div class="prot-actions admin-only">
-      <button class="btn" onclick="openProtoPreview()">📄 Сформировать протокол</button>
       <button class="btn btn-pri" onclick="saveProtTasks()">＋ Добавить</button>
     </div>
     <div class="prot-open-title">Открытые поручения</div>
     <div class="prot-open" id="prot-open"><div class="tasks-empty">Загрузка…</div></div>
+    <div class="prot-actions admin-only" style="margin-top:12px;">
+      <button class="btn" onclick="openProtoPreview()">📄 Сформировать протокол</button>
+    </div>
   </div>
 </div>
 
@@ -2558,8 +2560,8 @@ function makeProtRow(){
   row.className='prot-row';
   row.innerHTML=
     '<div class="prot-main">'+
-      '<textarea class="prot-text" placeholder="Тема"></textarea>'+
-      '<input class="prot-comm" placeholder="Описание">'+
+      '<input class="prot-text" placeholder="Тема">'+
+      '<textarea class="prot-comm" rows="2" placeholder="Описание" oninput="autoGrowComm(this)"></textarea>'+
     '</div>';
   return row;
 }
