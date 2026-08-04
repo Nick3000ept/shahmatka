@@ -2992,22 +2992,28 @@ async function saveTaskComment(id, val){
   }catch(ex){ toast('Ошибка сохранения комментария','err'); }
 }
 
-// Приоритет поручения: обычный <-> «Высокий»; высокие поднимаются наверх списка
+// Приоритет поручения: обычный <-> «Высокий»; высокие поднимаются наверх списка.
+// Optimistic UI: список меняется сразу, запрос уходит фоном; ошибка — откат с предупреждением.
 async function toggleTaskPriority(id){
   if(!ADMIN_PWD){ openPwdModal(function(){toggleTaskPriority(id);}); return; }
   var t=TASKS.find(function(x){return x.id===id;});
   if(!t) return;
-  var newPri=t.priority==='Высокий'?'':'Высокий';
+  var oldPri=t.priority||'';
+  var newPri=oldPri==='Высокий'?'':'Высокий';
+  t.priority=newPri;
+  cacheTasks();
+  renderTasksList();
   try{
     var j=await fetchJson(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
       action:'updateTask', pwd:ADMIN_PWD, id:id, priority:newPri
     })});
-    if(j.error){ toast(j.error,'err'); return; }
-    t.priority=newPri;
+    if(j.error) throw new Error(j.error);
+  }catch(ex){
+    t.priority=oldPri;
     cacheTasks();
     renderTasksList();
-    toast(newPri?'Приоритет: Высокий':'Приоритет снят','ok');
-  }catch(ex){ toast('Ошибка сохранения приоритета','err'); }
+    toast('Не удалось сохранить приоритет — вернул как было','err');
+  }
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────
