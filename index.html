@@ -129,9 +129,14 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .task-item .ti-org{font-size:11px;font-weight:600;color:var(--acc);}
 .task-item .ti-text{font-size:12px;color:var(--ink);margin-top:2px;word-break:break-word;}
 .task-item .ti-meta{font-size:10px;color:var(--ink3);margin-top:3px;}
-.task-item .ti-comm{width:100%;box-sizing:border-box;margin-top:4px;padding:4px 8px;border:1px dashed var(--brd2);border-radius:6px;font-size:11px;color:var(--ink);background:var(--bg2);outline:none;font-family:inherit;}
+.task-item .ti-comm{width:100%;box-sizing:border-box;margin-top:4px;padding:4px 8px;border:1px dashed var(--brd2);border-radius:6px;font-size:11px;color:var(--ink);background:var(--bg2);outline:none;font-family:inherit;resize:none;overflow:hidden;line-height:1.4;}
 .task-item .ti-comm:focus{border-color:var(--acc);border-style:solid;}
 .task-item .ti-comm-ro{font-size:11px;color:var(--ink3);margin-top:3px;font-style:italic;word-break:break-word;}
+.task-item.hi{border-left:3px solid #ef4444;}
+.ti-btns{display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:stretch;}
+.ti-btns .btn{white-space:nowrap;}
+.ti-pri.on{background:#fee2e2;border-color:#ef4444;color:#b91c1c;}
+.ti-pri-badge{font-size:10px;font-weight:700;color:#b91c1c;flex-shrink:0;}
 .tasks-empty{font-size:12px;color:var(--ink3);text-align:center;padding:16px;}
 .prot-auto{display:flex;flex-direction:column;gap:4px;}
 .pa-org{font-size:11px;font-weight:700;color:var(--acc);margin-top:8px;padding-bottom:3px;border-bottom:1px solid var(--brd);}
@@ -2605,14 +2610,19 @@ async function loadTasks(){
   }
 }
 function taskItemHtml(t, isDone){
-  // Не-админ видит поручения только для чтения: без правки комментария и кнопки «Выполнено»
+  // Не-админ видит поручения только для чтения: без правки комментария и кнопок
+  var hi=!isDone&&t.priority==='Высокий';
   var comm=(IS_ADMIN&&!isDone)
-    ?'<input class="ti-comm" placeholder="+ комментарий (попадёт в протокол)" value="'+e(t.comment||'')+'" onchange="saveTaskComment(\''+e(t.id)+'\',this.value)">'
+    ?'<textarea class="ti-comm" rows="1" placeholder="+ комментарий (попадёт в протокол)" oninput="autoGrowComm(this)" onchange="saveTaskComment(\''+e(t.id)+'\',this.value)">'+e(t.comment||'')+'</textarea>'
     :(t.comment?'<div class="ti-comm-ro">💬 '+e(t.comment)+'</div>':'');
-  var right=isDone
-    ?'<span style="font-size:10px;color:var(--ink3);flex-shrink:0;">✓</span>'
-    :(IS_ADMIN?'<button class="btn" onclick="markTaskDone(\''+e(t.id)+'\')">✓ Выполнено</button>':'');
-  return '<div class="task-item'+(isDone?' done':'')+'" data-tid="'+e(t.id)+'">'+
+  var right;
+  if(isDone) right='<span style="font-size:10px;color:var(--ink3);flex-shrink:0;">✓</span>';
+  else if(IS_ADMIN) right='<div class="ti-btns">'+
+      '<button class="btn" onclick="markTaskDone(\''+e(t.id)+'\')">✓ Выполнено</button>'+
+      '<button class="btn ti-pri'+(hi?' on':'')+'" onclick="toggleTaskPriority(\''+e(t.id)+'\')">'+(hi?'🔺 Высокий':'Приоритет')+'</button>'+
+    '</div>';
+  else right=hi?'<span class="ti-pri-badge">🔺 Высокий</span>':'';
+  return '<div class="task-item'+(isDone?' done':'')+(hi?' hi':'')+'" data-tid="'+e(t.id)+'">'+
     '<div class="ti-main">'+
       '<div class="ti-org">'+e(t.org)+'</div>'+
       '<div class="ti-text">'+e(t.text)+'</div>'+
@@ -2624,8 +2634,12 @@ function taskItemHtml(t, isDone){
 function renderTasksList(){
   var box=document.getElementById('prot-open');
   var html='';
-  if(!TASKS.length) html+='<div class="tasks-empty">Открытых поручений нет</div>';
-  else html+=TASKS.map(function(t){return taskItemHtml(t,false);}).join('');
+  // Поручения с высоким приоритетом — наверху, остальные в исходном порядке
+  var open=TASKS.slice().sort(function(a,b){
+    return (b.priority==='Высокий'?1:0)-(a.priority==='Высокий'?1:0);
+  });
+  if(!open.length) html+='<div class="tasks-empty">Открытых поручений нет</div>';
+  else html+=open.map(function(t){return taskItemHtml(t,false);}).join('');
   html+='<div class="tasks-done-hdr" onclick="toggleDoneList()">'+
     '<span class="done-arrow">'+(DONE_OPEN?'▾':'▸')+'</span> Выполнено'+
     (DONE_TASKS?' ('+DONE_TASKS.length+')':'')+'</div>';
@@ -2639,6 +2653,13 @@ function renderTasksList(){
     '</div>';
   }
   box.innerHTML=html;
+  // Комментарии — под высоту текста, чтобы было видно целиком
+  box.querySelectorAll('.ti-comm').forEach(function(el){ autoGrowComm(el); });
+}
+// Высота поля комментария подстраивается под текст
+function autoGrowComm(el){
+  el.style.height='auto';
+  el.style.height=(el.scrollHeight+2)+'px';
 }
 // Выполненные грузятся с сервера только при первом раскрытии блока
 async function toggleDoneList(){
@@ -2969,6 +2990,24 @@ async function saveTaskComment(id, val){
     cacheTasks();
     toast('Комментарий сохранён','ok');
   }catch(ex){ toast('Ошибка сохранения комментария','err'); }
+}
+
+// Приоритет поручения: обычный <-> «Высокий»; высокие поднимаются наверх списка
+async function toggleTaskPriority(id){
+  if(!ADMIN_PWD){ openPwdModal(function(){toggleTaskPriority(id);}); return; }
+  var t=TASKS.find(function(x){return x.id===id;});
+  if(!t) return;
+  var newPri=t.priority==='Высокий'?'':'Высокий';
+  try{
+    var j=await fetchJson(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+      action:'updateTask', pwd:ADMIN_PWD, id:id, priority:newPri
+    })});
+    if(j.error){ toast(j.error,'err'); return; }
+    t.priority=newPri;
+    cacheTasks();
+    renderTasksList();
+    toast(newPri?'Приоритет: Высокий':'Приоритет снят','ok');
+  }catch(ex){ toast('Ошибка сохранения приоритета','err'); }
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────

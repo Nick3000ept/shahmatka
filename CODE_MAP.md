@@ -176,6 +176,8 @@
 - `renderTasksList()` / `taskItemHtml(t,isDone)` — список поручений в `#prot-open`: открытые + блок «Выполнено»; у открытых — редактируемое поле комментария (`.ti-comm`, onchange → `saveTaskComment`), у выполненных комментарий только для чтения (`.ti-comm-ro`, 💬)
 - `toggleDoneList()` — раскрытие «Выполнено»; при первом раскрытии грузит `getTasks&all=1`, заполняет DONE_TASKS (и заодно обновляет TASKS)
 - `markTaskDone(id)` — POST `updateTask` статус «выполнено»; локально переносит из TASKS в DONE_TASKS
+- `toggleTaskPriority(id)` — кнопка «Приоритет»: обычный ↔ «Высокий» (POST `updateTask`, столбец I); высокие поручения сортируются наверх в `renderTasksList` (класс `.hi`, бейдж у не-админа)
+- `autoGrowComm(el)` — автовысота textarea комментария (при вводе и после отрисовки списка)
 - `saveTaskComment(id,val)` — POST `updateTask` с комментарием; локально обновляет `TASKS`, бэк не дёргает, если текст не изменился
 - `collectAutoTasks()` / `floorsCompact(floors)` — сбор «плана на 7 дней» для формирования протокола (блок «Из графика» из панели убран 2026-08-04, `renderAutoTasks` удалена)
 - `PROTO_INCLUDE` / `isProtoExcluded(org)` — белый список подрядчиков протокола (Топ ИД, Глобал)

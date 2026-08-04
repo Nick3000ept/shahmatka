@@ -549,18 +549,19 @@ function getCheckLists() {
 
 // ═══════════════════════════════════════════════════════════════════
 // ПОРУЧЕНИЯ (лист «Поручения») — ручные задачи для протокола
-// Столбцы: A=id | B=Подрядчик | C=Текст | D=Срок | E=Статус | F=Создано | G=Автор | H=Комментарий
-// Статус: 'открыто' | 'выполнено'
+// Столбцы: A=id | B=Подрядчик | C=Текст | D=Срок | E=Статус | F=Создано | G=Автор | H=Комментарий | I=Приоритет
+// Статус: 'открыто' | 'выполнено'. Приоритет: '' (обычный) | 'Высокий'
 // ═══════════════════════════════════════════════════════════════════
 function ensureTasksSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(TASKS_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(TASKS_SHEET);
-    sheet.appendRow(['id', 'Подрядчик', 'Текст', 'Срок', 'Статус', 'Создано', 'Автор', 'Комментарий']);
+    sheet.appendRow(['id', 'Подрядчик', 'Текст', 'Срок', 'Статус', 'Создано', 'Автор', 'Комментарий', 'Приоритет']);
     sheet.setFrozenRows(1);
   }
   if (String(sheet.getRange(1, 8).getValue()) === '') sheet.getRange(1, 8).setValue('Комментарий');
+  if (String(sheet.getRange(1, 9).getValue()) === '') sheet.getRange(1, 9).setValue('Приоритет');
   return sheet;
 }
 
@@ -568,7 +569,7 @@ function getTasks(includeAll) {
   var sheet = ensureTasksSheet_();
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return {tasks: []};
-  var values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+  var values = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
   var tasks = [];
   values.forEach(function(row) {
     var id = String(row[0]).trim();
@@ -583,7 +584,8 @@ function getTasks(includeAll) {
       status  : status,
       created : formatDateOut(row[5]),
       author  : String(row[6]).trim(),
-      comment : String(row[7]).trim()
+      comment : String(row[7]).trim(),
+      priority: String(row[8]).trim()
     });
   });
   return {tasks: tasks};
@@ -637,6 +639,7 @@ function updateTask(body) {
       if (body.text   !== undefined) sheet.getRange(r, 3).setValue(safeCell_(body.text));
       if (body.due    !== undefined) sheet.getRange(r, 4).setValue(safeCell_(body.due));
       if (body.comment !== undefined) sheet.getRange(r, 8).setValue(safeCell_(body.comment));
+      if (body.priority !== undefined) sheet.getRange(r, 9).setValue(safeCell_(body.priority));
       SpreadsheetApp.flush();
       return {ok: true};
     }
