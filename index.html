@@ -2075,11 +2075,18 @@ function msCommit(){
         if(curSt3==='s-empty') MOD[rid].status='s-started';
       }
     }
-    // Автодата: если статус "окончены/передано" и дата окончания пустая — ставим сегодня
-    var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS_MAP.get(rid)||{}).status||'']||'s-empty');
-    if((finalSt==='s-done')&&!MOD[rid].dateEnd){
-      var origRow=ROWS_MAP.get(rid);
-      if(!origRow||!origRow.dateEnd) MOD[rid].dateEnd=_today2;
+    // Автодата (решение пользователя 2026-08-04): закрытие — «СМР окончены» или 100% —
+    // перезаписывает дату окончания на сегодня; явно выбранная в msbar дата важнее.
+    var closedNow=MS_DRAFT.status==='s-done'||(MS_DRAFT.pct!==null&&parseInt(MS_DRAFT.pct)===100);
+    if(closedNow&&!dateVal){
+      MOD[rid].dateEnd=_today2;
+    }else{
+      // Подстраховка: статус «окончены», а даты нет ни в правках, ни в таблице — ставим сегодня
+      var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS_MAP.get(rid)||{}).status||'']||'s-empty');
+      if((finalSt==='s-done')&&!MOD[rid].dateEnd){
+        var origRow=ROWS_MAP.get(rid);
+        if(!origRow||!origRow.dateEnd) MOD[rid].dateEnd=_today2;
+      }
     }
   });
   resetMsDraft();
@@ -2246,11 +2253,19 @@ function savePanel(){
       var curSt2=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(origRow2||{}).status||'']||'s-empty');
       if(curSt2==='s-empty') MOD[rid].status='s-started';
     }
-    // Автодата: если статус "окончены/передано" и дата окончания пустая — ставим сегодня
-    var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS_MAP.get(rid)||{}).status||'']||'s-empty');
-    if((finalSt==='s-done')&&!MOD[rid].dateEnd){
-      var origRow=ROWS_MAP.get(rid);
-      if(!origRow||!origRow.dateEnd) MOD[rid].dateEnd=_today;
+    // Автодата (решение пользователя 2026-08-04): закрытие работы — статус «СМР окончены»
+    // или 100% — ПЕРЕЗАПИСЫВАЕТ дату окончания сегодняшним числом, даже если она была
+    // внесена вручную раньше. Исключение: в этом же сохранении дата указана явно — она важнее.
+    var closedNow=(_statusTouched&&CUR_ST==='s-done')||(_pctTouched&&pctSlider===100);
+    if(closedNow&&!_dateTouched){
+      MOD[rid].dateEnd=_today;
+    }else{
+      // Подстраховка: статус «окончены», а даты нет ни в правках, ни в таблице — ставим сегодня
+      var finalSt=MOD[rid].status!==undefined?MOD[rid].status:(S2CSS[(ROWS_MAP.get(rid)||{}).status||'']||'s-empty');
+      if((finalSt==='s-done')&&!MOD[rid].dateEnd){
+        var origRow=ROWS_MAP.get(rid);
+        if(!origRow||!origRow.dateEnd) MOD[rid].dateEnd=_today;
+      }
     }
     // Если ничего не изменилось — не добавлять в очередь на сохранение
     if(Object.keys(MOD[rid]).length===0) delete MOD[rid];
