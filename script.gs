@@ -197,6 +197,11 @@ function doPost(e) {
       return jsonOut(addTask(body));
     }
 
+    if (body.action === 'addTasks') {
+      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      return jsonOut(addTasks(body));
+    }
+
     if (body.action === 'updateTask') {
       if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
       return jsonOut(updateTask(body));
@@ -594,6 +599,27 @@ function addTask(body) {
   sheet.appendRow([id, safeCell_(org), safeCell_(text), safeCell_(body.due), 'открыто', nowStr, safeCell_(body.author), safeCell_(body.comment)]);
   SpreadsheetApp.flush();
   return {ok: true, id: id};
+}
+
+// Пакетное добавление: все поручения одним запросом, одна запись в лист.
+// Либо записывается весь пакет, либо (при ошибке валидации) ничего.
+function addTasks(body) {
+  var list = body.tasks;
+  if (!list || !list.length) return {error: 'Нет поручений'};
+  var sheet = ensureTasksSheet_();
+  var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy');
+  var rowsOut = [];
+  for (var i = 0; i < list.length; i++) {
+    var t = list[i] || {};
+    var org  = String(t.org || '').trim();
+    var text = String(t.text || '').trim();
+    if (!org || !text) return {error: 'У каждого поручения нужны подрядчик и текст (строка ' + (i + 1) + ')'};
+    var id = 't' + Date.now() + i + Math.floor(Math.random() * 1000);
+    rowsOut.push([id, safeCell_(org), safeCell_(text), safeCell_(t.due), 'открыто', nowStr, safeCell_(body.author), safeCell_(t.comment)]);
+  }
+  sheet.getRange(sheet.getLastRow() + 1, 1, rowsOut.length, 8).setValues(rowsOut);
+  SpreadsheetApp.flush();
+  return {ok: true, added: rowsOut.length};
 }
 
 function updateTask(body) {

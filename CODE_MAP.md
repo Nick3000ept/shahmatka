@@ -167,11 +167,14 @@
 - `sendNotifTg()` — читает галочки из `#notif-send-list` → POST `sendTgNotify` → сообщение в чат «Шахматка сб3»
 
 ### Поручения / Протокол — панель справа (admin-only, кнопка «📋 Протокол»)
-- `TASKS[]` — поручения из листа «Поручения» (`{id,org,text,due,status,created,author,comment}`); `PROT_OPEN` — панель открыта
+- `TASKS[]` — ОТКРЫТЫЕ поручения из листа «Поручения» (`{id,org,text,due,status,created,author,comment}`); `DONE_TASKS[]` — выполненные (`null` = ещё не загружены); `DONE_OPEN` — блок «Выполнено» раскрыт; `PROT_OPEN` — панель открыта
 - `makeProtRow()` / `resetProtRows()` / `protRowInput(el)` — строки ввода нового поручения в `#prot-rows`: текст (`.prot-text`) + комментарий (`.prot-comm`) слева, подрядчик (`.prot-org`) + срок (`.prot-date`) справа; ввод в последнюю строку добавляет новую пустую
-- `saveProtTasks()` — сохраняет заполненные строки → POST `addTask` (org/text/due/comment)
-- `loadTasks()` / `renderTasksList()` / `taskItemHtml(t,isDone)` — список поручений в `#prot-open`: открытые + свёрнутый блок «Выполнено»; у открытых — редактируемое поле комментария (`.ti-comm`, onchange → `saveTaskComment`), у выполненных комментарий только для чтения (`.ti-comm-ro`, 💬)
-- `markTaskDone(id)` — POST `updateTask` статус «выполнено»
+- `saveProtTasks()` — сохраняет заполненные строки пакетом → один POST `addTasks` (org/text/due/comment), через fetchJson с ретраями
+- `cacheTasks()` — пишет TASKS в localStorage `sb3_tasks`
+- `loadTasks()` — мгновенно рисует список из кэша localStorage, свежие ОТКРЫТЫЕ тянет фоном (`getTasks` без all=1)
+- `renderTasksList()` / `taskItemHtml(t,isDone)` — список поручений в `#prot-open`: открытые + блок «Выполнено»; у открытых — редактируемое поле комментария (`.ti-comm`, onchange → `saveTaskComment`), у выполненных комментарий только для чтения (`.ti-comm-ro`, 💬)
+- `toggleDoneList()` — раскрытие «Выполнено»; при первом раскрытии грузит `getTasks&all=1`, заполняет DONE_TASKS (и заодно обновляет TASKS)
+- `markTaskDone(id)` — POST `updateTask` статус «выполнено»; локально переносит из TASKS в DONE_TASKS
 - `saveTaskComment(id,val)` — POST `updateTask` с комментарием; локально обновляет `TASKS`, бэк не дёргает, если текст не изменился
 - `collectAutoTasks()` / `renderAutoTasks()` / `floorsCompact(floors)` — авто-блок «Из графика — план на 7 дней» в `#prot-auto`
 - `PROTO_INCLUDE` / `isProtoExcluded(org)` — белый список подрядчиков протокола (Топ ИД, Глобал)
