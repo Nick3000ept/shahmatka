@@ -119,7 +119,7 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .prot-actions{display:flex;justify-content:flex-end;padding-top:2px;}
 .prot-open-title{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:12px;padding-top:12px;border-top:1px solid var(--brd);}
 .prot-open{display:flex;flex-direction:column;gap:6px;}
-.task-item{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border:1px solid var(--brd);border-radius:8px;background:var(--bg);}
+.task-item{position:relative;display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border:1px solid var(--brd);border-radius:8px;background:var(--bg);}
 .task-item .ti-main{flex:1;min-width:0;}
 .task-item .ti-org{font-size:11px;font-weight:600;color:var(--acc);}
 .task-item .ti-text{font-size:12px;color:var(--ink);margin-top:2px;word-break:break-word;}
@@ -128,10 +128,14 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .task-item .ti-comm:focus{border-color:var(--acc);border-style:solid;}
 .task-item .ti-comm-ro{font-size:11px;color:var(--ink3);margin-top:3px;font-style:italic;word-break:break-word;}
 .task-item.hi{border-left:3px solid #ef4444;}
-.ti-btns{display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:stretch;}
+/* «Выполнено» — по вертикальному центру карточки; правее оставлен зазор под значок «!» */
+.ti-btns{display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:stretch;align-self:center;margin-right:22px;}
 .ti-btns .btn{white-space:nowrap;}
-.ti-pri.on{background:#fee2e2;border-color:#ef4444;color:#b91c1c;}
-.ti-pri-badge{font-size:10px;font-weight:700;color:#b91c1c;flex-shrink:0;}
+/* Значок приоритета «!» в правом верхнем углу карточки */
+.ti-pri-ico{position:absolute;top:7px;right:8px;width:20px;height:20px;border-radius:50%;border:1px solid var(--brd2);background:var(--bg2);color:var(--ink3);font-weight:800;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+.ti-pri-ico:hover{border-color:#ef4444;color:#ef4444;}
+.ti-pri-ico.on{background:#ef4444;border-color:#ef4444;color:#fff;}
+.ti-pri-ico.ro{cursor:default;}
 .tasks-empty{font-size:12px;color:var(--ink3);text-align:center;padding:16px;}
 .prot-auto{display:flex;flex-direction:column;gap:4px;}
 .pa-org{font-size:11px;font-weight:700;color:var(--acc);margin-top:8px;padding-bottom:3px;border-bottom:1px solid var(--brd);}
@@ -2595,14 +2599,15 @@ function taskItemHtml(t, isDone){
   var comm=(IS_ADMIN&&!isDone)
     ?'<textarea class="ti-comm" rows="1" placeholder="+ комментарий (попадёт в протокол)" oninput="autoGrowComm(this)" onchange="saveTaskComment(\''+e(t.id)+'\',this.value)">'+e(t.comment||'')+'</textarea>'
     :(t.comment?'<div class="ti-comm-ro">💬 '+e(t.comment)+'</div>':'');
-  var right;
+  var right='', priIco='';
   if(isDone) right='<span style="font-size:10px;color:var(--ink3);flex-shrink:0;">✓</span>';
-  else if(IS_ADMIN) right='<div class="ti-btns">'+
-      '<button class="btn" onclick="markTaskDone(\''+e(t.id)+'\')">✓ Выполнено</button>'+
-      '<button class="btn ti-pri'+(hi?' on':'')+'" onclick="toggleTaskPriority(\''+e(t.id)+'\')">'+(hi?'🔺 Высокий':'Приоритет')+'</button>'+
-    '</div>';
-  else right=hi?'<span class="ti-pri-badge">🔺 Высокий</span>':'';
+  else if(IS_ADMIN){
+    right='<div class="ti-btns"><button class="btn" onclick="markTaskDone(\''+e(t.id)+'\')">✓ Выполнено</button></div>';
+    priIco='<button class="ti-pri-ico'+(hi?' on':'')+'" title="'+(hi?'Высокий приоритет — нажмите, чтобы снять':'Отметить высокий приоритет')+'" onclick="toggleTaskPriority(\''+e(t.id)+'\')">!</button>';
+  }
+  else if(hi) priIco='<span class="ti-pri-ico on ro" title="Высокий приоритет">!</span>';
   return '<div class="task-item'+(isDone?' done':'')+(hi?' hi':'')+'" data-tid="'+e(t.id)+'">'+
+    priIco+
     '<div class="ti-main">'+
       (t.org?'<div class="ti-org">'+e(t.org)+'</div>':'')+
       '<div class="ti-text">'+e(t.text)+'</div>'+
