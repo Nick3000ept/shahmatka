@@ -3006,23 +3006,31 @@ function exportExcel(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000);
   toast('Excel-файл скачан','ok');
 }
-// Печать на А3 (решение пользователя 2026-08-12). Ориентация автоматически
-// по числу колонок работ: до 12 — книжная, больше — альбомная
+// Печать: лист А3, книжная ориентация (решение пользователя 2026-08-12).
+// Таблица целиком (все этажи и колонки) масштабируется под один лист —
+// перед печатью меряем её размер и подбираем масштаб (zoom).
 function exportPdf(){
   var t=buildExportTable();
   if(!t){ toast('Нет строк для экспорта — проверьте фильтры','inf'); return; }
-  var landscape=t.cols>12;
   var st=document.createElement('style');
   st.id='exp-print-style';
-  st.textContent='@media print{@page{size:A3 '+(landscape?'landscape':'portrait')+';margin:8mm;}'
-    +'#print-area .x-tbl{width:100%;table-layout:fixed;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
-    +'#print-area .x-tbl td,#print-area .x-tbl th{overflow:hidden;}'
+  st.textContent='@media print{@page{size:A3 portrait;margin:8mm;}'
     +'#print-area table{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
   document.head.appendChild(st);
   var pa=document.getElementById('print-area');
   pa.innerHTML='<div class="p-title">Шахматка СБ3</div>'
     +'<div class="p-meta">Выгрузка от '+expStamp()+' · '+e(expFilterSummary())+'</div>'
-    +t.html+expLegendHtml();
+    +'<div id="exp-fit">'+t.html+expLegendHtml()+'</div>';
+  // Подбор масштаба: временно показываем блок за экраном (в ширину листа) и меряем
+  var PXMM=96/25.4; // px в одном мм при печати
+  var pageW=(297-16)*PXMM, pageH=(420-16)*PXMM; // А3 книжная минус поля 8мм
+  pa.style.cssText='display:block;position:absolute;left:-10000px;top:0;width:'+pageW+'px;';
+  var tbl=pa.querySelector('.x-tbl');
+  var fit=document.getElementById('exp-fit');
+  var headerH=fit.offsetTop; // фактическая высота заголовка и строки фильтров
+  var scale=Math.min(pageW/tbl.offsetWidth,(pageH-headerH-8)/fit.offsetHeight,1);
+  fit.style.zoom=scale;
+  pa.style.cssText='';
   document.body.classList.add('printing');
   var done=function(){
     document.body.classList.remove('printing');
