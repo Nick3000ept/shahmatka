@@ -2933,7 +2933,10 @@ function buildExportTable(){
     var wk=c.corpus+'|'+c.place+'|'+c.lvl2+'|'+c.work; workSpans[wk]=(workSpans[wk]||0)+1;
   });
   var hasExtra1=cols.some(function(c){return c.extra1;});
-  var TH='style="border:1px solid #94a3b8;background:#f1f5f9;font-size:9px;font-weight:700;padding:2px 3px;text-align:center;"';
+  // Шапка — тем же размером, что даты (16px), названия работ с переносом (решение 2026-08-12)
+  var TH='style="border:1px solid #94a3b8;background:#f1f5f9;font-size:16px;font-weight:700;padding:3px 4px;text-align:center;vertical-align:middle;"';
+  // Обёртка названия работы: фиксированная ширина → все колонки одинаковые, текст переносится
+  var wrapTh=function(txt){return '<div style="width:120px;margin:0 auto;white-space:normal;">'+e(txt)+'</div>';};
   var added;
   var h='<table class="x-tbl" style="border-collapse:collapse;">';
   h+='<thead><tr><th '+TH+' rowspan="'+(hasExtra1?4:3)+'">Этаж</th>';
@@ -2951,17 +2954,17 @@ function buildExportTable(){
   added={};
   cols.forEach(function(c){
     var wk=c.corpus+'|'+c.place+'|'+c.lvl2+'|'+c.work;
-    if(!added[wk]){ h+='<th '+TH+' colspan="'+workSpans[wk]+'">'+e(c.work)+'</th>'; added[wk]=true; }
+    if(!added[wk]){ h+='<th '+TH+' colspan="'+workSpans[wk]+'">'+wrapTh(c.work)+'</th>'; added[wk]=true; }
   });
   h+='</tr>';
   if(hasExtra1){
     h+='<tr>';
-    cols.forEach(function(c){ h+='<th '+TH+'>'+e(c.extra1||'')+'</th>'; });
+    cols.forEach(function(c){ h+='<th '+TH+'>'+wrapTh(c.extra1||'')+'</th>'; });
     h+='</tr>';
   }
   h+='</thead><tbody>';
   floors.forEach(function(fl){
-    h+='<tr><td style="border:1px solid #94a3b8;background:#f1f5f9;font-weight:700;font-size:9px;text-align:center;padding:2px 3px;">'+fl+'</td>';
+    h+='<tr><td style="border:1px solid #94a3b8;background:#f1f5f9;font-weight:700;font-size:16px;text-align:center;padding:2px 4px;">'+fl+'</td>';
     cols.forEach(function(c){
       var row=idx[fl+'|||'+c.corpus+'|||'+c.place+'|||'+c.lvl2+'|||'+c.work+'|||'+c.extra1];
       if(!row){ h+='<td style="border:1px solid #94a3b8;background:'+EXP_ST_COLORS['s-nodata']+';"></td>'; return; }
