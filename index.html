@@ -407,6 +407,9 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
 .preset-chip.on{background:var(--acc);color:#fff;}
 .preset-chip .pdel{opacity:.5;font-size:13px;line-height:1;padding:0 2px;cursor:pointer;}
 .preset-chip .pdel:hover{opacity:1;}
+/* Системные пресеты (задаёт админ, видны всем) — красные */
+.preset-chip.sys{border-color:#dc2626;color:#dc2626;}
+.preset-chip.sys:hover,.preset-chip.sys.on{background:#dc2626;color:#fff;}
 .preset-add{padding:2px 10px;border-radius:14px;font-size:11px;font-weight:500;border:1px dashed var(--brd2);background:transparent;color:var(--ink3);cursor:pointer;transition:all .1s;}
 .preset-add:hover{border-color:var(--acc);color:var(--acc);}
 .preset-inp-row{display:none;align-items:center;gap:5px;}
@@ -655,6 +658,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   <div class="preset-inp-row" id="preset-inp-row">
     <input class="preset-inp" id="preset-inp" placeholder="Название…" maxlength="40"
       onkeydown="if(event.key==='Enter')savePreset();if(event.key==='Escape')presetCancelClick();">
+    <label id="preset-sys-lbl" style="display:none;align-items:center;gap:4px;font-size:11px;color:#dc2626;cursor:pointer;white-space:nowrap;"><input type="checkbox" id="preset-sys-chk">Системный (виден всем)</label>
     <button class="preset-btn ok" onclick="savePreset()">OK</button>
     <button class="preset-btn cancel" onclick="presetCancelClick()">✕</button>
   </div>
@@ -1033,6 +1037,7 @@ window.onload=function(){
   });
   applyRoleUI();
   loadPresets();
+  loadSysPresets();
   loadData();
   setTimeout(loadContractors, 1500);
   document.addEventListener('keydown',function(e){
@@ -1356,10 +1361,24 @@ function toggleFMod(){
 
 // ─── PRESETS ──────────────────────────────────────────────────────
 var PRESETS={};
-var ACTIVE_PRESET=null;
+var SYS_PRESETS={}; // системные пресеты (лист «Пресеты», задаёт админ, видны всем)
+var ACTIVE_PRESET=null; // имя пресета; системные — с префиксом 'sys:'
 function loadPresets(){
   try{PRESETS=JSON.parse(localStorage.getItem('sb3_presets')||'{}');}catch(ex){PRESETS={};}
   renderPresetChips();
+}
+// Системные: мгновенно из кэша localStorage, свежие — фоном с бэка
+async function loadSysPresets(){
+  try{SYS_PRESETS=JSON.parse(localStorage.getItem('sb3_sys_presets')||'{}');}catch(ex){SYS_PRESETS={};}
+  renderPresetChips();
+  try{
+    var j=await fetchJson(BASE+'?action=getSysPresets&t='+Date.now());
+    if(j&&j.presets){
+      SYS_PRESETS=j.presets;
+      try{localStorage.setItem('sb3_sys_presets',JSON.stringify(SYS_PRESETS));}catch(ex){}
+      renderPresetChips();
+    }
+  }catch(ex){/* нет сети — остаёмся на кэше */}
 }
 function applyNoFilter(){
   ACTIVE_PRESET='__none__';
@@ -1378,7 +1397,6 @@ function applyNoFilter(){
   render();
 }
 function renderPresetChips(){
-  var names=Object.keys(PRESETS);
   var el=document.getElementById('preset-chips');
   el.innerHTML='';
   // Неудаляемый пресет «Без фильтров»
@@ -1388,7 +1406,17 @@ function renderPresetChips(){
   none.title='Сбросить все фильтры';
   none.addEventListener('click', applyNoFilter);
   el.appendChild(none);
-  names.forEach(function(n){
+  // Системные (красные) — первыми; крестик удаления только у админа
+  Object.keys(SYS_PRESETS).forEach(function(n){
+    var chip=document.createElement('span');
+    chip.className='preset-chip sys'+(ACTIVE_PRESET==='sys:'+n?' on':'');
+    chip.title=(ACTIVE_PRESET==='sys:'+n?'Снять фильтры':'Применить: ')+n+' (системный)';
+    chip.innerHTML=e(n)+(IS_ADMIN?'<span class="pdel" title="Удалить у всех" onclick="event.stopPropagation();deleteSysPreset(\''+e(n).replace(/'/g,"\\'")+'\')">&times;</span>':'');
+    chip.addEventListener('click',function(){applyPreset(n,true);});
+    el.appendChild(chip);
+  });
+  // Личные (localStorage этого браузера)
+  Object.keys(PRESETS).forEach(function(n){
     var chip=document.createElement('span');
     chip.className='preset-chip'+(ACTIVE_PRESET===n?' on':'');
     chip.title=(ACTIVE_PRESET===n?'Снять фильтры':'Применить: ')+n;
@@ -1400,6 +1428,10 @@ function renderPresetChips(){
 function presetAddClick(){
   var row=document.getElementById('preset-inp-row');
   row.classList.add('show');
+  // Галочка «Системный (виден всем)» — только у админа
+  var lbl=document.getElementById('preset-sys-lbl');
+  lbl.style.display=IS_ADMIN?'inline-flex':'none';
+  document.getElementById('preset-sys-chk').checked=false;
   var inp=document.getElementById('preset-inp');
   inp.value='';
   inp.focus();
@@ -1407,10 +1439,8 @@ function presetAddClick(){
 function presetCancelClick(){
   document.getElementById('preset-inp-row').classList.remove('show');
 }
-function savePreset(){
-  var name=document.getElementById('preset-inp').value.trim();
-  if(!name){toast('Введите название','err');return;}
-  PRESETS[name]={
+function currentFilterCfg(){
+  return {
     corpus:[...FC],
     org:FO,
     place:FM,
@@ -1420,14 +1450,60 @@ function savePreset(){
     kp:FKP,
     statuses:[...FSTATUS]
   };
+}
+function savePreset(){
+  var name=document.getElementById('preset-inp').value.trim();
+  if(!name){toast('Введите название','err');return;}
+  var isSys=IS_ADMIN&&document.getElementById('preset-sys-chk').checked;
+  if(isSys){saveSysPreset(name);return;}
+  PRESETS[name]=currentFilterCfg();
   localStorage.setItem('sb3_presets',JSON.stringify(PRESETS));
   renderPresetChips();
   presetCancelClick();
   toast('Пресет «'+name+'» сохранён','ok');
 }
-function applyPreset(name){
+// Системный пресет: пишется на бэк (лист «Пресеты»), то же имя — обновление у всех
+async function saveSysPreset(name){
+  if(!ADMIN_PWD){ openPwdModal(function(){saveSysPreset(name);}); return; }
+  var cfg=currentFilterCfg();
+  try{
+    var j=await fetchJson(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+      action:'saveSysPreset', pwd:ADMIN_PWD, name:name, cfg:cfg
+    })});
+    if(j&&j.ok){
+      SYS_PRESETS[name]=cfg;
+      try{localStorage.setItem('sb3_sys_presets',JSON.stringify(SYS_PRESETS));}catch(ex){}
+      renderPresetChips();
+      presetCancelClick();
+      toast('Системный пресет «'+name+'» сохранён — виден всем','ok');
+    }else{
+      toast('Не удалось сохранить: '+((j&&j.error)||'ошибка сети'),'err');
+    }
+  }catch(ex){ toast('Не удалось сохранить системный пресет','err'); }
+}
+async function deleteSysPreset(name){
+  if(!IS_ADMIN) return;
+  if(!confirm('Удалить системный пресет «'+name+'» у всех пользователей?')) return;
+  if(!ADMIN_PWD){ openPwdModal(function(){deleteSysPreset(name);}); return; }
+  try{
+    var j=await fetchJson(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+      action:'deleteSysPreset', pwd:ADMIN_PWD, name:name
+    })});
+    if(j&&j.ok){
+      delete SYS_PRESETS[name];
+      try{localStorage.setItem('sb3_sys_presets',JSON.stringify(SYS_PRESETS));}catch(ex){}
+      if(ACTIVE_PRESET==='sys:'+name) ACTIVE_PRESET=null;
+      renderPresetChips();
+      toast('Системный пресет удалён','inf');
+    }else{
+      toast('Не удалось удалить: '+((j&&j.error)||'ошибка сети'),'err');
+    }
+  }catch(ex){ toast('Не удалось удалить системный пресет','err'); }
+}
+function applyPreset(name,isSys){
+  var key=isSys?'sys:'+name:name;
   // Повторный клик — снимаем фильтры
-  if(ACTIVE_PRESET===name){
+  if(ACTIVE_PRESET===key){
     ACTIVE_PRESET=null;
     FC.clear(); FO=''; FM=''; FL1=''; FL2=''; FKP=false; FW.clear(); FSTATUS.clear();
     document.getElementById('forg').value='';
@@ -1445,9 +1521,9 @@ function applyPreset(name){
     render();
     return;
   }
-  var p=PRESETS[name];
+  var p=isSys?SYS_PRESETS[name]:PRESETS[name];
   if(!p) return;
-  ACTIVE_PRESET=name;
+  ACTIVE_PRESET=key;
   // Корпус
   FC.clear();
   (p.corpus||[]).forEach(function(c){FC.add(c);});

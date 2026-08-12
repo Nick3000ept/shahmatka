@@ -66,14 +66,19 @@
 - Если ни один из трёх не активен — блок фильтра не применяется
 
 ### Пресеты фильтров
-- `PRESETS{}` — словарь `{name: {FC, FO, FM, FL1, FL2, FW, FKP}}`, хранится в localStorage `sb3_presets`
-- `ACTIVE_PRESET` — имя активного пресета, `'__none__'` (Без фильтров), или `null`
+- `PRESETS{}` — личные пресеты `{name: cfg}`, localStorage `sb3_presets`
+- `SYS_PRESETS{}` — системные пресеты (лист «Пресеты» на бэке, задаёт админ, видны всем; 2026-08-12); кэш в localStorage `sb3_sys_presets`
+- `ACTIVE_PRESET` — имя активного пресета (системные — с префиксом `'sys:'`), `'__none__'` (Без фильтров), или `null`
+- `loadSysPresets()` — мгновенно из кэша localStorage, свежие фоном `getSysPresets` (вызывается из onload)
+- `currentFilterCfg()` — текущие фильтры → объект cfg (corpus/org/place/lvl1/lvl2/works/kp/statuses)
 - `applyNoFilter()` — сбрасывает все фильтры, ставит `ACTIVE_PRESET='__none__'`
-- `renderPresetChips()` — перерисовывает чипы: первым всегда неудаляемый «Без фильтров»
-- `presetAddClick()` / `presetCancelClick()` — показывает/скрывает поле ввода имени
-- `savePreset()` — сохраняет текущий фильтр как пресет
-- `applyPreset(name)` — применяет пресет (FC/FO/FM/FL1/FL2/FW/FKP) → render
-- `deletePreset(name)` — удаляет пресет из PRESETS и localStorage
+- `renderPresetChips()` — чипы: «Без фильтров», затем системные (красные `.sys`, крестик только у админа), затем личные
+- `presetAddClick()` / `presetCancelClick()` — показывает/скрывает поле ввода имени; у админа — галочка `#preset-sys-chk` «Системный (виден всем)»
+- `savePreset()` — личный в localStorage; с галочкой — `saveSysPreset(name)`
+- `saveSysPreset(name)` — POST `saveSysPreset` (pwd админа; нет — `openPwdModal`); то же имя = обновление у всех
+- `applyPreset(name, isSys)` — применяет пресет (системный при isSys=true) → render
+- `deletePreset(name)` — удаляет личный пресет из PRESETS и localStorage
+- `deleteSysPreset(name)` — только админ: confirm → POST `deleteSysPreset` (бэк очищает строку листа)
 
 ### Фильтры в DOM
 - `#forg` — Организация
