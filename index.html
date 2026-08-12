@@ -2900,7 +2900,7 @@ function expFilterSummary(){
   if(FM) p.push('Место: '+FM);
   if(FL2) p.push('Группа работ: '+FL2);
   if(FL1) p.push('Вид работ: '+FL1);
-  if(FW.size) p.push('Работы: '+[...FW].join(', '));
+  // список выбранных работ в шапку не выводим (решение пользователя 2026-08-12) — работы видны в заголовках колонок
   if(FSTATUS.size) p.push('Статус: '+[...FSTATUS].map(function(s){return statusShort(s)||'Без статуса';}).join(', '));
   if(FKP) p.push('КП');
   if(FOVERDUE) p.push('Просрочено');
@@ -2967,20 +2967,12 @@ function buildExportTable(){
       if(!row){ h+='<td style="border:1px solid #94a3b8;background:'+EXP_ST_COLORS['s-nodata']+';"></td>'; return; }
       var mod=MOD[row.rowId];
       var s=mod&&mod.status!==undefined?mod.status:(S2CSS[row.status||'']||'s-empty');
-      var pct=mod&&mod.pct!==undefined?mod.pct:(row.pct||'');
-      var pctNum=0;
-      if(pct!==''){
-        var _p=parseFloat(String(pct).replace('%','').replace(',','.'));
-        if(!isNaN(_p)) pctNum=Math.min(100,Math.max(0,Math.round(_p*100)));
-      }
+      // в ячейке — только дата (без процентов, решение пользователя 2026-08-12)
       var dateEnd=mod&&mod.dateEnd!==undefined?mod.dateEnd:(row.dateEnd||'');
       var d=row.currentDate||dateEnd||row.baseDate||'';
       var dLbl='';
       if(d){ var dp=fmtDate(d).split('.'); dLbl=dp[0]+'.'+dp[1]; }
-      var parts=[];
-      if(pctNum>0) parts.push(pctNum+'%');
-      if(dLbl) parts.push(dLbl);
-      h+='<td style="border:1px solid #94a3b8;background:'+(EXP_ST_COLORS[s]||'#ffffff')+';font-size:8px;text-align:center;padding:1px 2px;white-space:nowrap;">'+e(parts.join(' '))+'</td>';
+      h+='<td style="border:1px solid #94a3b8;background:'+(EXP_ST_COLORS[s]||'#ffffff')+';font-size:16px;text-align:center;padding:2px 3px;white-space:nowrap;">'+e(dLbl)+'</td>';
     });
     h+='</tr>';
   });
@@ -3014,14 +3006,15 @@ function exportExcel(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000);
   toast('Excel-файл скачан','ok');
 }
-// Ориентация PDF: до 9 колонок работ — книжная, больше — альбомная
+// Печать на А3 (решение пользователя 2026-08-12). Ориентация автоматически
+// по числу колонок работ: до 12 — книжная, больше — альбомная
 function exportPdf(){
   var t=buildExportTable();
   if(!t){ toast('Нет строк для экспорта — проверьте фильтры','inf'); return; }
-  var landscape=t.cols>9;
+  var landscape=t.cols>12;
   var st=document.createElement('style');
   st.id='exp-print-style';
-  st.textContent='@media print{@page{size:A4 '+(landscape?'landscape':'portrait')+';margin:8mm;}'
+  st.textContent='@media print{@page{size:A3 '+(landscape?'landscape':'portrait')+';margin:8mm;}'
     +'#print-area .x-tbl{width:100%;table-layout:fixed;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
     +'#print-area .x-tbl td,#print-area .x-tbl th{overflow:hidden;}'
     +'#print-area table{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
