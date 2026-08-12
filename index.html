@@ -194,6 +194,12 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .send-row{display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 10px;border:1px solid var(--brd);border-radius:6px;color:#111;cursor:pointer;}
 .send-row input{cursor:pointer;}
 .send-row.nomail{opacity:.55;cursor:default;font-style:italic;}
+/* ── Меню экспорта (кнопка «⬇ Экспорт» в topbar) ── */
+.exp-wrap{position:relative;display:inline-block;}
+.exp-menu{display:none;position:absolute;top:calc(100% + 4px);right:0;background:#fff;border:1px solid var(--brd);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:400;min-width:160px;padding:4px;}
+.exp-menu.on{display:block;}
+.exp-mi{padding:7px 10px;font-size:11px;border-radius:6px;cursor:pointer;white-space:nowrap;color:var(--ink);}
+.exp-mi:hover{background:rgba(59,130,246,.12);}
 #print-area{display:none;}
 @media print{
   body.printing > *{display:none!important;}
@@ -554,6 +560,13 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
     <span class="fl" style="font-size:11px;color:var(--ink3);">👤</span>
     <input class="url-input" id="author-inp" placeholder="Ваше имя…" style="width:130px;" oninput="saveAuthor(this.value)">
     <div class="sep"></div>
+    <div class="exp-wrap">
+      <button class="btn" id="exp-btn" onclick="toggleExpMenu(event)" style="font-size:11px;">⬇ Экспорт</button>
+      <div class="exp-menu" id="exp-menu">
+        <div class="exp-mi" onclick="exportExcel()">📗 Excel (.xls)</div>
+        <div class="exp-mi" onclick="exportPdf()">📄 PDF (печать)</div>
+      </div>
+    </div>
     <button class="btn" id="an-btn" onclick="toggleAnalytics()" style="font-size:11px;">📊 Аналитика</button>
     <button class="btn" id="prot-btn" onclick="toggleProt()" style="font-size:11px;">📋 Протокол</button>
     <!-- Уведомления пока скрыты (решение пользователя 2026-08-04): вернуть — убрать display:none -->
@@ -2864,6 +2877,166 @@ function printProtocol(){
   pa.innerHTML=html;
   document.body.classList.add('printing');
   var done=function(){ document.body.classList.remove('printing'); window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done);
+  setTimeout(function(){ window.print(); setTimeout(done,500); },50);
+}
+
+// ── Экспорт отфильтрованных работ (кнопка «⬇ Экспорт»: Excel / PDF) ──
+// Выгружается ровно то, что видно на экране: VISIBLE_ROWS/COL_KEYS/FLOOR_LIST
+// из последнего render() + несохранённые правки из MOD (как в шахматке).
+var EXP_ST_COLORS={'s-done':'#dcfce7','s-started':'#fef9c3','s-front':'#ffedd5','s-onsite':'#bfdbfe','s-remarks':'#fee2e2','s-empty':'#ffffff','s-nodata':'#c2c7d0'};
+function toggleExpMenu(ev){
+  if(ev) ev.stopPropagation();
+  document.getElementById('exp-menu').classList.toggle('on');
+}
+document.addEventListener('click',function(){
+  var m=document.getElementById('exp-menu');
+  if(m&&m.classList.contains('on')) m.classList.remove('on');
+});
+function expFilterSummary(){
+  var p=[];
+  if(FC.size) p.push('Корпус: '+[...FC].join(', '));
+  if(FO) p.push('Организация: '+FO);
+  if(FM) p.push('Место: '+FM);
+  if(FL2) p.push('Группа работ: '+FL2);
+  if(FL1) p.push('Вид работ: '+FL1);
+  if(FW.size) p.push('Работы: '+[...FW].join(', '));
+  if(FSTATUS.size) p.push('Статус: '+[...FSTATUS].map(function(s){return statusShort(s)||'Без статуса';}).join(', '));
+  if(FKP) p.push('КП');
+  if(FOVERDUE) p.push('Просрочено');
+  if(FPLAN7) p.push('План на 7 дней');
+  if(FPLAN30) p.push('План на 30 дней');
+  if(FPROTOCOL) p.push('Протокол');
+  if(FDATE) p.push('До даты: '+fmtDate(FDATE));
+  return p.length?p.join(' · '):'Без фильтров';
+}
+function expStamp(){
+  var d=new Date();
+  var p2=function(n){return n<10?'0'+n:String(n);};
+  return p2(d.getDate())+'.'+p2(d.getMonth()+1)+'.'+d.getFullYear();
+}
+function buildExportTable(){
+  if(FLOOR_READINESS) return null; // режим «Готовность этажей» не экспортируем
+  var board=document.getElementById('board');
+  if(!board||board.style.display==='none') return null; // «Нет строк по фильтру»
+  if(!VISIBLE_ROWS.length||!COL_KEYS.length||!FLOOR_LIST.length) return null;
+  var cols=COL_KEYS, floors=FLOOR_LIST;
+  var idx={};
+  VISIBLE_ROWS.forEach(function(r){
+    var fl=parseFloat(String(r.floor).replace(',','.'));
+    idx[fl+'|||'+r.corpus+'|||'+(r.place||'')+'|||'+(r.lvl2||'')+'|||'+r.work+'|||'+(r.extra1||'')]=r;
+  });
+  var corpSpans={},placeSpans={},workSpans={};
+  cols.forEach(function(c){
+    corpSpans[c.corpus]=(corpSpans[c.corpus]||0)+1;
+    var pk=c.corpus+'|'+c.place; placeSpans[pk]=(placeSpans[pk]||0)+1;
+    var wk=c.corpus+'|'+c.place+'|'+c.lvl2+'|'+c.work; workSpans[wk]=(workSpans[wk]||0)+1;
+  });
+  var hasExtra1=cols.some(function(c){return c.extra1;});
+  var TH='style="border:1px solid #94a3b8;background:#f1f5f9;font-size:9px;font-weight:700;padding:2px 3px;text-align:center;"';
+  var added;
+  var h='<table class="x-tbl" style="border-collapse:collapse;">';
+  h+='<thead><tr><th '+TH+' rowspan="'+(hasExtra1?4:3)+'">Этаж</th>';
+  added={};
+  cols.forEach(function(c){
+    if(!added[c.corpus]){ h+='<th '+TH+' colspan="'+corpSpans[c.corpus]+'">'+e(c.corpus)+'</th>'; added[c.corpus]=true; }
+  });
+  h+='</tr><tr>';
+  added={};
+  cols.forEach(function(c){
+    var pk=c.corpus+'|'+c.place;
+    if(!added[pk]){ h+='<th '+TH+' colspan="'+placeSpans[pk]+'">'+e(c.place||'—')+'</th>'; added[pk]=true; }
+  });
+  h+='</tr><tr>';
+  added={};
+  cols.forEach(function(c){
+    var wk=c.corpus+'|'+c.place+'|'+c.lvl2+'|'+c.work;
+    if(!added[wk]){ h+='<th '+TH+' colspan="'+workSpans[wk]+'">'+e(c.work)+'</th>'; added[wk]=true; }
+  });
+  h+='</tr>';
+  if(hasExtra1){
+    h+='<tr>';
+    cols.forEach(function(c){ h+='<th '+TH+'>'+e(c.extra1||'')+'</th>'; });
+    h+='</tr>';
+  }
+  h+='</thead><tbody>';
+  floors.forEach(function(fl){
+    h+='<tr><td style="border:1px solid #94a3b8;background:#f1f5f9;font-weight:700;font-size:9px;text-align:center;padding:2px 3px;">'+fl+'</td>';
+    cols.forEach(function(c){
+      var row=idx[fl+'|||'+c.corpus+'|||'+c.place+'|||'+c.lvl2+'|||'+c.work+'|||'+c.extra1];
+      if(!row){ h+='<td style="border:1px solid #94a3b8;background:'+EXP_ST_COLORS['s-nodata']+';"></td>'; return; }
+      var mod=MOD[row.rowId];
+      var s=mod&&mod.status!==undefined?mod.status:(S2CSS[row.status||'']||'s-empty');
+      var pct=mod&&mod.pct!==undefined?mod.pct:(row.pct||'');
+      var pctNum=0;
+      if(pct!==''){
+        var _p=parseFloat(String(pct).replace('%','').replace(',','.'));
+        if(!isNaN(_p)) pctNum=Math.min(100,Math.max(0,Math.round(_p*100)));
+      }
+      var dateEnd=mod&&mod.dateEnd!==undefined?mod.dateEnd:(row.dateEnd||'');
+      var d=row.currentDate||dateEnd||row.baseDate||'';
+      var dLbl='';
+      if(d){ var dp=fmtDate(d).split('.'); dLbl=dp[0]+'.'+dp[1]; }
+      var parts=[];
+      if(pctNum>0) parts.push(pctNum+'%');
+      if(dLbl) parts.push(dLbl);
+      h+='<td style="border:1px solid #94a3b8;background:'+(EXP_ST_COLORS[s]||'#ffffff')+';font-size:8px;text-align:center;padding:1px 2px;white-space:nowrap;">'+e(parts.join(' '))+'</td>';
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table>';
+  return {html:h,cols:cols.length};
+}
+function expLegendHtml(){
+  var items=[['s-done','СМР окончены'],['s-started','СМР начаты'],['s-front','Фронт открыт'],['s-onsite','На площадке'],['s-remarks','Замечания'],['s-empty','Без статуса'],['s-nodata','Нет данных']];
+  var h='<table style="border-collapse:collapse;margin-top:8px;"><tr>';
+  items.forEach(function(i){
+    h+='<td style="border:1px solid #94a3b8;background:'+EXP_ST_COLORS[i[0]]+';width:14px;height:12px;"></td>';
+    h+='<td style="font-size:8px;padding:0 10px 0 3px;border:none;">'+i[1]+'</td>';
+  });
+  h+='</tr></table>';
+  return h;
+}
+function exportExcel(){
+  var t=buildExportTable();
+  if(!t){ toast('Нет строк для экспорта — проверьте фильтры','inf'); return; }
+  var html='<html><head><meta charset="utf-8"></head><body>'
+    +'<div style="font-weight:700;">Шахматка СБ3 — выгрузка от '+expStamp()+'</div>'
+    +'<div style="font-size:10px;">'+e(expFilterSummary())+'</div><br>'
+    +t.html+expLegendHtml()+'</body></html>';
+  // в начале строки — невидимый BOM-символ U+FEFF: без него Excel ломает кириллицу
+  var blob=new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Шахматка_СБ3_'+expStamp()+'.xls';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000);
+  toast('Excel-файл скачан','ok');
+}
+// Ориентация PDF: до 9 колонок работ — книжная, больше — альбомная
+function exportPdf(){
+  var t=buildExportTable();
+  if(!t){ toast('Нет строк для экспорта — проверьте фильтры','inf'); return; }
+  var landscape=t.cols>9;
+  var st=document.createElement('style');
+  st.id='exp-print-style';
+  st.textContent='@media print{@page{size:A4 '+(landscape?'landscape':'portrait')+';margin:8mm;}'
+    +'#print-area .x-tbl{width:100%;table-layout:fixed;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    +'#print-area .x-tbl td,#print-area .x-tbl th{overflow:hidden;}'
+    +'#print-area table{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
+  document.head.appendChild(st);
+  var pa=document.getElementById('print-area');
+  pa.innerHTML='<div class="p-title">Шахматка СБ3</div>'
+    +'<div class="p-meta">Выгрузка от '+expStamp()+' · '+e(expFilterSummary())+'</div>'
+    +t.html+expLegendHtml();
+  document.body.classList.add('printing');
+  var done=function(){
+    document.body.classList.remove('printing');
+    window.removeEventListener('afterprint',done);
+    var s2=document.getElementById('exp-print-style');
+    if(s2) s2.remove(); // иначе альбомная ориентация останется и для печати протокола
+  };
   window.addEventListener('afterprint',done);
   setTimeout(function(){ window.print(); setTimeout(done,500); },50);
 }
