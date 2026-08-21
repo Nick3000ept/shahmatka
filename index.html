@@ -231,7 +231,7 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .cl-item-remarks{font-size:10px;color:var(--ink2);margin-top:4px;line-height:1.4;background:var(--red-bg);border-radius:4px;padding:3px 7px;white-space:pre-wrap;}
 
 /* ── ANALYTICS PANEL ── */
-.an-panel{display:none;position:fixed;top:0;right:0;width:640px;max-width:96vw;height:100vh;background:var(--bg2);border-left:1px solid var(--brd);z-index:490;flex-direction:column;box-shadow:-6px 0 28px rgba(0,0,0,.1);}
+.an-panel{display:none;position:fixed;top:0;right:0;width:800px;max-width:96vw;height:100vh;background:var(--bg2);border-left:1px solid var(--brd);z-index:490;flex-direction:column;box-shadow:-6px 0 28px rgba(0,0,0,.1);}
 .an-panel.on{display:flex;}
 .an-head{display:flex;align-items:flex-start;justify-content:space-between;padding:13px 16px 11px;border-bottom:1px solid var(--brd);flex-shrink:0;gap:8px;}
 .an-title{font-size:26px;font-weight:600;color:var(--ink);}
@@ -255,7 +255,7 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .an-grp-hdr td{background:var(--bg3)!important;font-size:18px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;padding:6px 10px;border-bottom:1px solid var(--brd2);border-top:2px solid var(--brd2);}
 .an-work-row{cursor:pointer;}
 .an-work-row:hover td{background:var(--bg3)!important;}
-.an-detail td{background:#f0f4ff;font-size:20px;color:var(--ink2);padding:3px 10px;border-bottom:1px solid var(--brd);}
+.an-detail td{background:#f0f4ff;font-size:22px;color:var(--ink2);padding:3px 10px;border-bottom:1px solid var(--brd);}
 .an-detail td.r{text-align:right;font-family:var(--mono);font-weight:600;color:var(--acc);}
 .an-table{width:100%;border-collapse:collapse;font-size:22px;}
 .an-table th{text-align:left;padding:6px 10px;font-size:18px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;border-bottom:2px solid var(--brd2);position:sticky;top:0;background:var(--bg2);z-index:2;}
@@ -277,7 +277,7 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .board-wrap{flex:1;overflow:auto;position:relative;}
 /* Панель аналитики перекрывает правый край шахматки: сдвигаем прокручиваемую
    область вправо на ширину панели, чтобы можно было доскроллить до скрытых колонок */
-body.analytics-open .board-wrap{padding-right:min(640px,96vw);}
+body.analytics-open .board-wrap{padding-right:min(800px,96vw);}
 .board-wrap::-webkit-scrollbar{width:5px;height:5px;}
 .board-wrap::-webkit-scrollbar-track{background:var(--bg);}
 .board-wrap::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:3px;}
@@ -3472,7 +3472,7 @@ function renderAnalytics(){
     corps.forEach(c=>{
       var cd=d.corpora[c];
       h+='<tr class="an-detail an-d-'+idx+'" style="display:none">';
-      h+='<td style="padding-left:28px;font-size:10px;">'+e(c)+'</td>';
+      h+='<td style="padding-left:28px;">'+e(c)+'</td>';
       h+='<td class="r"><span class="an-num'+(cd.week===0?' zero':'')+'">'+cd.week+'</span></td>';
       h+='<td class="r"><span class="an-num'+(cd.month===0?' zero':'')+'">'+cd.month+'</span></td>';
       h+='<td class="r"><span class="an-num'+(cd.total===0?' zero':'')+'">'+cd.total+'</span></td>';
