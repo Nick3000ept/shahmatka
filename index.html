@@ -3326,6 +3326,18 @@ function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
 // ─── ANALYTICS ────────────────────────────────────────────────────
 var ANALYTICS_OPEN=false;
+var AN_UNIT='fl'; // единица счёта аналитики: 'fl' — этажи, 'kv' — квартиры
+function setAnUnit(u){
+  if(AN_UNIT===u) return;
+  AN_UNIT=u;
+  if(u==='kv'&&!FLATS){
+    // лист «Квартиры» ещё не загружен — тянем и перерисовываем
+    fetchJson(BASE+'?action=getFlats&t='+Date.now())
+      .then(function(j){FLATS=j.flats||{};renderAnalytics();})
+      .catch(function(){toast('Ошибка загрузки квартир','err');AN_UNIT='fl';renderAnalytics();});
+  }
+  renderAnalytics();
+}
 function toggleAnalytics(){
   ANALYTICS_OPEN=!ANALYTICS_OPEN;
   if(ANALYTICS_OPEN&&typeof closeProt==='function') closeProt();
@@ -3381,24 +3393,41 @@ function renderAnalytics(){
   var todayStr=p2(todayD.getDate())+'.'+p2(todayD.getMonth()+1)+'.'+todayD.getFullYear();
   document.getElementById('an-date').textContent='на '+todayStr;
 
+  // Единица счёта: этажи (1 строка = 1) или квартиры (строка квартирной работы =
+  // число квартир на этом этаже по листу «Квартиры»; МОП/этажные работы — по-прежнему 1)
+  var useKv=AN_UNIT==='kv';
+  if(useKv&&!FLATS){
+    document.getElementById('an-body').innerHTML=buildStaffingHtml()+anUnitToggleHtml()
+      +'<div class="an-empty">Загрузка данных по квартирам…</div>';
+    return;
+  }
+  function rowWeight(r){
+    if(!useKv) return 1;
+    if(String(r.place||'').toLowerCase().indexOf('квартир')<0) return 1;
+    var fc=(FLATS&&FLATS[r.corpus])?FLATS[r.corpus][r.floor]:null;
+    return fc?(fc[0]+fc[1]+fc[2]):0;
+  }
   rows.forEach(r=>{
     var mod=MOD[r.rowId];
     var s=mod&&mod.status!==undefined?mod.status:(S2CSS[r.status||'']||'s-empty');
     var isDone=s==='s-done';
     var work=r.work||'—';
     var corp=r.corpus||'?';
-    if(!byWork[work]) byWork[work]={week:0,month:0,total:0,place:r.place||'',lvl2:r.lvl2||'',corpora:{}};
-    if(!byWork[work].corpora[corp]) byWork[work].corpora[corp]={week:0,month:0,total:0};
+    var wt=rowWeight(r);
+    if(!byWork[work]) byWork[work]={week:0,month:0,total:0,plan:0,place:r.place||'',lvl2:r.lvl2||'',corpora:{}};
+    if(!byWork[work].corpora[corp]) byWork[work].corpora[corp]={week:0,month:0,total:0,plan:0};
+    byWork[work].plan+=wt;
+    byWork[work].corpora[corp].plan+=wt;
     if(!isDone) return;
     totalDone++;
-    byWork[work].total++;
-    byWork[work].corpora[corp].total++;
+    byWork[work].total+=wt;
+    byWork[work].corpora[corp].total+=wt;
     var dateEnd=mod&&mod.dateEnd!==undefined?mod.dateEnd:(r.dateEnd||'');
     var dMs=dateEnd?parseDateMs(fmtDate(dateEnd)):0;
     if(dMs&&dMs<=todayEndMs){
       var age=now-dMs;
-      if(age<=weekMs){byWork[work].week++;byWork[work].corpora[corp].week++;}
-      if(age<=monthMs){byWork[work].month++;byWork[work].corpora[corp].month++;}
+      if(age<=weekMs){byWork[work].week+=wt;byWork[work].corpora[corp].week+=wt;}
+      if(age<=monthMs){byWork[work].month+=wt;byWork[work].corpora[corp].month+=wt;}
     }
   });
 
@@ -3412,26 +3441,28 @@ function renderAnalytics(){
   });
 
   if(!works.length){
-    document.getElementById('an-body').innerHTML='<div class="an-empty">Нет данных по текущему фильтру</div>';
+    document.getElementById('an-body').innerHTML=buildStaffingHtml()+anUnitToggleHtml()
+      +'<div class="an-empty">Нет данных по текущему фильтру</div>';
     return;
   }
 
   var h='<table class="an-table">';
-  h+='<thead><tr><th>Работа</th><th class="r">7 дн</th><th class="r">30 дн</th><th class="r">Факт</th></tr></thead><tbody>';
+  h+='<thead><tr><th>Работа</th><th class="r">7 дн</th><th class="r">30 дн</th><th class="r">Факт</th><th class="r">Итого</th></tr></thead><tbody>';
   var curPlace='__NONE__';
   var idx=0;
   works.forEach(w=>{
     var d=byWork[w];
     if(d.place!==curPlace){
       curPlace=d.place;
-      h+='<tr class="an-grp-hdr"><td colspan="4">'+e(curPlace||'Прочее')+'</td></tr>';
+      h+='<tr class="an-grp-hdr"><td colspan="5">'+e(curPlace||'Прочее')+'</td></tr>';
     }
     // Строка работы
     h+='<tr class="an-work-row an-wr-'+idx+'" onclick="toggleAnDetail('+idx+')">';
     h+='<td style="max-width:200px;word-break:break-word;line-height:1.35;padding-left:10px;"><span class="an-arrow">▸</span> '+e(w)+'</td>';
     h+='<td class="r"><span class="an-num'+(d.week===0?' zero':'')+'">'+d.week+'</span></td>';
     h+='<td class="r"><span class="an-num'+(d.month===0?' zero':'')+'">'+d.month+'</span></td>';
-    h+='<td class="r"><span class="an-num">'+d.total+'</span></td></tr>';
+    h+='<td class="r"><span class="an-num">'+d.total+'</span></td>';
+    h+='<td class="r"><span class="an-num'+(d.plan===0?' zero':'')+'" style="color:var(--ink3);">'+d.plan+'</span></td></tr>';
     // Строки корпусов (скрыты)
     var corps=Object.keys(d.corpora).sort();
     corps.forEach(c=>{
@@ -3440,12 +3471,24 @@ function renderAnalytics(){
       h+='<td style="padding-left:28px;font-size:10px;">'+e(c)+'</td>';
       h+='<td class="r"><span class="an-num'+(cd.week===0?' zero':'')+'">'+cd.week+'</span></td>';
       h+='<td class="r"><span class="an-num'+(cd.month===0?' zero':'')+'">'+cd.month+'</span></td>';
-      h+='<td class="r"><span class="an-num'+(cd.total===0?' zero':'')+'">'+cd.total+'</span></td></tr>';
+      h+='<td class="r"><span class="an-num'+(cd.total===0?' zero':'')+'">'+cd.total+'</span></td>';
+      h+='<td class="r"><span class="an-num'+(cd.plan===0?' zero':'')+'" style="color:var(--ink3);">'+cd.plan+'</span></td></tr>';
     });
     idx++;
   });
   h+='</tbody></table>';
-  document.getElementById('an-body').innerHTML=buildStaffingHtml()+h;
+  document.getElementById('an-body').innerHTML=buildStaffingHtml()+anUnitToggleHtml()+h;
+}
+// Переключатель единицы счёта аналитики: этажи / квартиры
+function anUnitToggleHtml(){
+  return '<div style="display:flex;align-items:center;gap:8px;margin:0 0 8px;">'
+    +'<span style="font-size:10px;color:var(--ink3);">Считать в:</span>'
+    +'<div style="display:flex;">'
+    +'<button class="btn'+(AN_UNIT==='fl'?' btn-pri':'')+'" style="font-size:11px;padding:3px 12px;border-radius:6px 0 0 6px;" onclick="setAnUnit(\'fl\')">Этажи</button>'
+    +'<button class="btn'+(AN_UNIT==='kv'?' btn-pri':'')+'" style="font-size:11px;padding:3px 12px;border-radius:0 6px 6px 0;" onclick="setAnUnit(\'kv\')">Квартиры</button>'
+    +'</div>'
+    +(AN_UNIT==='kv'?'<span style="font-size:10px;color:var(--ink3);">квартирные работы — в квартирах, МОП и этажи — в этажах</span>':'')
+    +'</div>';
 }
 function toggleAnDetail(idx){
   var open=false;
