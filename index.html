@@ -257,7 +257,7 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .an-work-row:hover td{background:var(--bg3)!important;}
 .an-detail td{background:#f0f4ff;font-size:22px;color:var(--ink2);padding:3px 10px;border-bottom:1px solid var(--brd);}
 .an-detail td.r{text-align:right;font-family:var(--mono);font-weight:600;color:var(--acc);}
-.an-table{width:100%;border-collapse:collapse;font-size:22px;}
+.an-table{width:100%;border-collapse:collapse;font-size:22px;table-layout:fixed;}
 .an-table th{text-align:left;padding:6px 10px;font-size:18px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;border-bottom:2px solid var(--brd2);position:sticky;top:0;background:var(--bg2);z-index:2;}
 .an-table th.r{text-align:right;width:72px;white-space:nowrap;}
 .an-table td{padding:6px 10px;border-bottom:1px solid var(--brd);vertical-align:middle;color:var(--ink);}
@@ -3443,6 +3443,7 @@ function renderAnalytics(){
   }
 
   var h='<table class="an-table">';
+  h+='<colgroup><col><col style="width:76px"><col style="width:82px"><col style="width:76px"><col style="width:86px"></colgroup>';
   h+='<thead><tr><th>Работа</th><th class="r">7 дн</th><th class="r">30 дн</th><th class="r">Факт</th><th class="r">Итого</th></tr></thead><tbody>';
   var curPlace='__NONE__';
   var idx=0;
