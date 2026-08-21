@@ -3406,7 +3406,10 @@ function renderAnalytics(){
     if(!useKv) return 1;
     if(String(r.place||'').toLowerCase().indexOf('квартир')<0) return 1;
     var fc=(FLATS&&FLATS[r.corpus])?FLATS[r.corpus][r.floor]:null;
-    return fc?fc[0]:0;
+    if(!fc) return 0;
+    // Монтаж конвекторов идёт во всех квартирах, не только MR Base (решение 2026-08-21)
+    if(String(r.work||'').toLowerCase().indexOf('конвектор')>=0) return fc[0]+fc[1]+fc[2];
+    return fc[0];
   }
   rows.forEach(r=>{
     var mod=MOD[r.rowId];
