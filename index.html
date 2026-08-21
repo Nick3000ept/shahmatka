@@ -238,7 +238,7 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .an-sub{font-size:20px;color:var(--ink3);margin-top:3px;line-height:1.4;}
 .an-body{overflow-y:auto;flex:1;padding:0;}
 .an-body::-webkit-scrollbar{width:4px;}
-.staff-section{padding:14px 16px 0;border-bottom:1px solid var(--brd);}
+.staff-section{padding:14px 16px 0;border-top:1px solid var(--brd);}
 .staff-title{font-size:22px;font-weight:600;color:var(--ink);margin-bottom:8px;}
 .staff-legend{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
 .staff-leg-item{display:flex;align-items:center;gap:4px;font-size:20px;color:var(--ink2);}
@@ -3392,8 +3392,8 @@ function renderAnalytics(){
   // Shell and Core не считаем; МОП/этажные работы — по-прежнему 1)
   var useKv=AN_UNIT==='kv';
   if(useKv&&!FLATS){
-    document.getElementById('an-body').innerHTML=buildStaffingHtml()+anUnitToggleHtml()
-      +'<div class="an-empty">Загрузка данных по квартирам…</div>';
+    document.getElementById('an-body').innerHTML=anUnitToggleHtml()
+      +'<div class="an-empty">Загрузка данных по квартирам…</div>'+buildStaffingHtml();
     return;
   }
   function rowWeight(r){
@@ -3437,8 +3437,8 @@ function renderAnalytics(){
   });
 
   if(!works.length){
-    document.getElementById('an-body').innerHTML=buildStaffingHtml()+anUnitToggleHtml()
-      +'<div class="an-empty">Нет данных по текущему фильтру</div>';
+    document.getElementById('an-body').innerHTML=anUnitToggleHtml()
+      +'<div class="an-empty">Нет данных по текущему фильтру</div>'+buildStaffingHtml();
     return;
   }
 
@@ -3473,7 +3473,7 @@ function renderAnalytics(){
     idx++;
   });
   h+='</tbody></table>';
-  document.getElementById('an-body').innerHTML=buildStaffingHtml()+anUnitToggleHtml()+h;
+  document.getElementById('an-body').innerHTML=anUnitToggleHtml()+h+buildStaffingHtml();
 }
 // Переключатель единицы счёта аналитики: этажи / квартиры
 function anUnitToggleHtml(){
