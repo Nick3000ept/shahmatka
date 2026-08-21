@@ -3394,7 +3394,8 @@ function renderAnalytics(){
   document.getElementById('an-date').textContent='на '+todayStr;
 
   // Единица счёта: этажи (1 строка = 1) или квартиры (строка квартирной работы =
-  // число квартир на этом этаже по листу «Квартиры»; МОП/этажные работы — по-прежнему 1)
+  // число квартир MR Base на этом этаже по листу «Квартиры» — только категория [0],
+  // Shell and Core не считаем; МОП/этажные работы — по-прежнему 1)
   var useKv=AN_UNIT==='kv';
   if(useKv&&!FLATS){
     document.getElementById('an-body').innerHTML=buildStaffingHtml()+anUnitToggleHtml()
@@ -3405,7 +3406,7 @@ function renderAnalytics(){
     if(!useKv) return 1;
     if(String(r.place||'').toLowerCase().indexOf('квартир')<0) return 1;
     var fc=(FLATS&&FLATS[r.corpus])?FLATS[r.corpus][r.floor]:null;
-    return fc?(fc[0]+fc[1]+fc[2]):0;
+    return fc?fc[0]:0;
   }
   rows.forEach(r=>{
     var mod=MOD[r.rowId];
@@ -3487,7 +3488,7 @@ function anUnitToggleHtml(){
     +'<button class="btn'+(AN_UNIT==='fl'?' btn-pri':'')+'" style="font-size:11px;padding:3px 12px;border-radius:6px 0 0 6px;" onclick="setAnUnit(\'fl\')">Этажи</button>'
     +'<button class="btn'+(AN_UNIT==='kv'?' btn-pri':'')+'" style="font-size:11px;padding:3px 12px;border-radius:0 6px 6px 0;" onclick="setAnUnit(\'kv\')">Квартиры</button>'
     +'</div>'
-    +(AN_UNIT==='kv'?'<span style="font-size:10px;color:var(--ink3);">квартирные работы — в квартирах, МОП и этажи — в этажах</span>':'')
+    +(AN_UNIT==='kv'?'<span style="font-size:10px;color:var(--ink3);">квартирные работы — в квартирах MR Base, МОП и этажи — в этажах</span>':'')
     +'</div>';
 }
 function toggleAnDetail(idx){
