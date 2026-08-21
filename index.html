@@ -259,9 +259,9 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .an-detail td.r{text-align:right;font-family:var(--mono);font-weight:600;color:var(--acc);}
 .an-table{width:100%;border-collapse:collapse;font-size:22px;}
 .an-table th{text-align:left;padding:6px 10px;font-size:18px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;border-bottom:2px solid var(--brd2);position:sticky;top:0;background:var(--bg2);z-index:2;}
-.an-table th.r{text-align:right;}
+.an-table th.r{text-align:right;width:72px;white-space:nowrap;}
 .an-table td{padding:6px 10px;border-bottom:1px solid var(--brd);vertical-align:middle;color:var(--ink);}
-.an-table td.r{text-align:right;font-family:var(--mono);font-size:24px;font-weight:600;}
+.an-table td.r{text-align:right;font-family:var(--mono);font-size:24px;font-weight:600;padding-left:4px;white-space:nowrap;}
 .an-table tr:last-child td{border-bottom:none;}
 .an-num{color:var(--acc);}
 .an-num.zero{color:var(--ink3);font-weight:400;}
@@ -3454,7 +3454,7 @@ function renderAnalytics(){
     }
     // Строка работы
     h+='<tr class="an-work-row an-wr-'+idx+'" onclick="toggleAnDetail('+idx+')">';
-    h+='<td style="max-width:200px;word-break:break-word;line-height:1.35;padding-left:10px;"><span class="an-arrow">▸</span> '+e(w)+'</td>';
+    h+='<td style="word-break:break-word;line-height:1.35;padding-left:10px;"><span class="an-arrow">▸</span> '+e(w)+'</td>';
     h+='<td class="r"><span class="an-num'+(d.week===0?' zero':'')+'">'+d.week+'</span></td>';
     h+='<td class="r"><span class="an-num'+(d.month===0?' zero':'')+'">'+d.month+'</span></td>';
     h+='<td class="r"><span class="an-num">'+d.total+'</span></td>';
