@@ -3387,12 +3387,6 @@ function renderAnalytics(){
   var byWork={};
   var totalAll=rows.length,totalDone=0;
 
-  // Отчётная дата
-  var todayD=new Date(now);
-  var p2=function(n){return n<10?'0'+n:String(n);};
-  var todayStr=p2(todayD.getDate())+'.'+p2(todayD.getMonth()+1)+'.'+todayD.getFullYear();
-  document.getElementById('an-date').textContent='на '+todayStr;
-
   // Единица счёта: этажи (1 строка = 1) или квартиры (строка квартирной работы =
   // число квартир MR Base на этом этаже по листу «Квартиры» — только категория [0],
   // Shell and Core не считаем; МОП/этажные работы — по-прежнему 1)
@@ -3434,8 +3428,6 @@ function renderAnalytics(){
       if(age<=monthMs){byWork[work].month+=wt;byWork[work].corpora[corp].month+=wt;}
     }
   });
-
-  document.getElementById('an-sub').textContent='';
 
   var works=Object.keys(byWork).sort((a,b)=>{
     var da=byWork[a],db=byWork[b];
@@ -3485,13 +3477,10 @@ function renderAnalytics(){
 }
 // Переключатель единицы счёта аналитики: этажи / квартиры
 function anUnitToggleHtml(){
-  return '<div style="display:flex;align-items:center;gap:8px;margin:0 0 8px;">'
-    +'<span style="font-size:10px;color:var(--ink3);">Считать в:</span>'
-    +'<div style="display:flex;">'
+  return '<div style="display:flex;margin:10px 16px 8px;">'
     +'<button class="btn'+(AN_UNIT==='fl'?' btn-pri':'')+'" style="font-size:11px;padding:3px 12px;border-radius:6px 0 0 6px;" onclick="setAnUnit(\'fl\')">Этажи</button>'
     +'<button class="btn'+(AN_UNIT==='kv'?' btn-pri':'')+'" style="font-size:11px;padding:3px 12px;border-radius:0 6px 6px 0;" onclick="setAnUnit(\'kv\')">Квартиры</button>'
-    +'</div>'
-    +(AN_UNIT==='kv'?'<span style="font-size:10px;color:var(--ink3);">квартирные работы — в квартирах MR Base, МОП и этажи — в этажах</span>':'')
+    +'<button class="btn" onclick="openPivot()" style="font-size:11px;padding:3px 12px;margin-left:10px;" title="Сводная по месяцам">📅 Сводная</button>'
     +'</div>';
 }
 function toggleAnDetail(idx){
@@ -3807,12 +3796,7 @@ function clOpenLink(url){if(url) window.open(url,'_blank');}
 
 <!-- ANALYTICS PANEL -->
 <div id="analytics-panel" class="an-panel">
-  <div class="an-head">
-    <div>
-      <div class="an-title">Аналитика выполнения <span id="an-date" style="font-size:22px;font-weight:400;color:var(--ink3);margin-left:6px;font-family:var(--mono);"></span></div>
-      <div class="an-sub" id="an-sub">По отфильтрованным данным</div>
-    </div>
-    <button class="btn" onclick="openPivot()" style="padding:3px 9px;font-size:11px;flex-shrink:0;" title="Сводная по месяцам">📅 Сводная</button>
+  <div class="an-head" style="justify-content:flex-end;">
     <button class="btn" onclick="closeAnalytics()" style="padding:3px 9px;font-size:12px;flex-shrink:0;">✕</button>
   </div>
   <div class="an-body" id="an-body"></div>
