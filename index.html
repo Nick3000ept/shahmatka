@@ -423,6 +423,8 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
 .chk-lbl input{cursor:pointer;accent-color:var(--acc);}
 .chk-lbl:hover{color:var(--ink);}
 .work-tags{display:flex;flex-wrap:wrap;gap:3px;align-items:center;}
+.work-tags-toggle{display:inline-flex;align-items:center;gap:4px;background:var(--acc);color:#fff;border-radius:6px;font-size:10px;font-weight:600;padding:2px 9px;cursor:pointer;user-select:none;white-space:nowrap;}
+.work-tags-toggle:hover{background:var(--acc2);}
 .work-tag{display:flex;align-items:center;gap:3px;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:500;background:var(--blue-bg);border:1px solid rgba(37,99,235,.3);color:var(--acc);white-space:nowrap;}
 .work-tag-x{cursor:pointer;opacity:.6;font-size:9px;margin-left:1px;}
 .work-tag-x:hover{opacity:1;}
@@ -618,6 +620,7 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
 <!-- FILTER TAGS BAR -->
 <div class="filter-tags-bar" id="filter-tags-bar" style="display:none">
   <div class="filter-tags-list" id="filter-tags-list"></div>
+  <span class="work-tags-toggle" id="work-tags-toggle" style="display:none" onclick="toggleWorkTags()"></span>
   <div class="work-tags" id="work-tags"></div>
 </div>
 
@@ -989,16 +992,32 @@ function toggleWork(w){
   renderDeferred();
 }
 
+// Блок тегов работ сворачиваемый — по умолчанию свёрнут, чтобы не заслонять шахматку
+var WORK_TAGS_OPEN=localStorage.getItem('sb3_worktags_open')==='1';
+function toggleWorkTags(){
+  WORK_TAGS_OPEN=!WORK_TAGS_OPEN;
+  localStorage.setItem('sb3_worktags_open',WORK_TAGS_OPEN?'1':'0');
+  updateWorkInp();
+}
 function updateWorkInp(){
   var inp=document.getElementById('work-search-inp');
   if(inp){inp.value='';inp.placeholder=FW.size===0?'Поиск работ…':'';}
   var tags=document.getElementById('work-tags');
+  var tgl=document.getElementById('work-tags-toggle');
   if(!tags) return;
-  if(FW.size===0){tags.innerHTML='';}
-  else{
-    tags.innerHTML=[...FW].map(w=>
+  if(FW.size===0){
+    tags.innerHTML='';
+    if(tgl) tgl.style.display='none';
+  }else{
+    if(tgl){
+      tgl.style.display='';
+      tgl.textContent=(WORK_TAGS_OPEN?'▾':'▸')+' Работы: '+FW.size;
+      tgl.title=WORK_TAGS_OPEN?'Свернуть список работ':'Развернуть список работ';
+    }
+    tags.style.display=WORK_TAGS_OPEN?'':'none';
+    tags.innerHTML=WORK_TAGS_OPEN?[...FW].map(w=>
       '<span class="work-tag">'+e(w)+'<span class="work-tag-x" onmousedown="toggleWork(\''+e(w)+'\')">✕</span></span>'
-    ).join('');
+    ).join(''):'';
   }
   renderFilterTags();
 }
