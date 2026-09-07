@@ -2892,7 +2892,13 @@ function collectAutoTasks(){
     if(!byOrg[r.org]) byOrg[r.org]={};
     if(!byOrg[r.org][key]) byOrg[r.org][key]={work:r.work,corpus:r.corpus,dueMs:ms,due:fmtDate(r.dateEnd),floors:[],authors:{}};
     byOrg[r.org][key].floors.push(r.floor);
-    if(r.author) byOrg[r.org][key].authors[r.author]=1; // собираем уникальных авторов
+    // Уникальные авторы срока; у каждого храним самую позднюю дату его правки (столбец K)
+    if(r.author){
+      var chg=fmtDate(r.dateChg||'');
+      var prevChg=byOrg[r.org][key].authors[r.author];
+      if(prevChg===undefined||(chg&&(parseDateMs(chg)||0)>(parseDateMs(prevChg)||0)))
+        byOrg[r.org][key].authors[r.author]=chg||prevChg||'';
+    }
   });
   return byOrg;
 }
@@ -2936,8 +2942,19 @@ function openProtoPreview(){
     html+='<div class="proto-sec"><div class="proto-org" contenteditable="true">'+e(org)+'</div>';
     Object.values(byOrg[org]).sort(function(a,b){return a.dueMs-b.dueMs;}).forEach(function(it){
       var authors=Object.keys(it.authors);
+      // «поставил: Имя, изменено ДД.ММ.ГГГГ»; если правки всех авторов в один день —
+      // дата пишется один раз в конце (2026-09-07)
+      var chgList=authors.map(function(a){return it.authors[a]||'';});
+      var oneDate=chgList[0]&&chgList.every(function(c){return c===chgList[0];});
+      var who='';
+      if(authors.length){
+        who=oneDate
+          ? authors.join(', ')+', изменено '+chgList[0]
+          : authors.map(function(a){return it.authors[a]?a+', изменено '+it.authors[a]:a;}).join('; ');
+        who=' (поставил: '+who+')';
+      }
       html+=protoItemHtml(it.work+', '+it.corpus+': эт. '+floorsCompact(it.floors)
-        +' — срок '+it.due+(authors.length?' (поставил: '+authors.join(', ')+')':''));
+        +' — срок '+it.due+who);
     });
     html+='<button class="btn pi-add" onclick="protoAddItem(this)">+ строка</button></div>';
   });
