@@ -1655,18 +1655,41 @@ function render(){
     }
   });
 
-  // Сортируем по корпусу → место → factNum
+  // Сортируем по корпусу → место → работа → factNum.
+  // Колонки одного места (и одной работы) обязаны идти подряд — иначе объединённые
+  // заголовки «Место»/«Работа» в шапке считаются по общему числу колонок и съезжают
+  // относительно работ под ними (инцидент 2026-09-07). Места вне PLACE_ORDER
+  // (Лифт. холл, Лест. клетка и др.) раньше перемешивались между собой по factNum.
   var PLACE_ORDER={'Этаж':1,'МОП':2,'Квартира':3};
+  var placeMinFn={}, workMinFn={};
+  COL_KEYS.forEach(c=>{
+    var pk=c.corpus+'|'+c.place;
+    if(placeMinFn[pk]===undefined||c.factNum<placeMinFn[pk]) placeMinFn[pk]=c.factNum;
+    var wk=c.corpus+'|'+c.place+'|'+(c.lvl2||'')+'|'+c.work;
+    if(workMinFn[wk]===undefined||c.factNum<workMinFn[wk]) workMinFn[wk]=c.factNum;
+  });
   COL_KEYS.sort((a,b)=>{
     var cc=a.corpus.localeCompare(b.corpus,undefined,{numeric:true,sensitivity:'base'});
     if(cc!==0) return cc;
     var po=(PLACE_ORDER[a.place]||99)-(PLACE_ORDER[b.place]||99);
     if(po!==0) return po;
-    if(a.factNum!==b.factNum) return a.factNum-b.factNum;
-    var lc=(a.lvl2||'').localeCompare(b.lvl2||'',undefined,{sensitivity:'base'});
-    if(lc!==0) return lc;
-    var wc=a.work.localeCompare(b.work,undefined,{sensitivity:'base'});
-    if(wc!==0) return wc;
+    if(a.place!==b.place){
+      // места без заданного порядка — по самой ранней работе места, затем по названию
+      var pd=placeMinFn[a.corpus+'|'+a.place]-placeMinFn[b.corpus+'|'+b.place];
+      if(pd!==0) return pd;
+      return a.place.localeCompare(b.place,undefined,{sensitivity:'base'});
+    }
+    var awk=a.corpus+'|'+a.place+'|'+(a.lvl2||'')+'|'+a.work;
+    var bwk=b.corpus+'|'+b.place+'|'+(b.lvl2||'')+'|'+b.work;
+    if(awk!==bwk){
+      // разные работы — по самой ранней подколонке работы (её факт. номеру)
+      var wd=workMinFn[awk]-workMinFn[bwk];
+      if(wd!==0) return wd;
+      var lc=(a.lvl2||'').localeCompare(b.lvl2||'',undefined,{sensitivity:'base'});
+      if(lc!==0) return lc;
+      return a.work.localeCompare(b.work,undefined,{sensitivity:'base'});
+    }
+    // внутри одной работы — подколонки (ЛК1/ЛК2 и т.п.)
     return (a.extra1||'').localeCompare(b.extra1||'',undefined,{numeric:true,sensitivity:'base'});
   });
 
