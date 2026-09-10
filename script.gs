@@ -37,6 +37,18 @@ function safeCell_(v) {
   return s.slice(0, 1000);
 }
 
+// Проверка года в дате окончания (задача пользователя 2026-09-10): подрядчик ввёл «2626»
+// и сломал отчёты. Допустимо 2020 … текущий год + 1. Пустое значение = очистка ячейки, разрешено.
+// Дата с недопустимым годом НЕ записывается, строка возвращается в badDates[].
+function dateOk_(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (!s) return true;
+  var m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(s);
+  if (!m) return false;
+  var y = parseInt(m[3], 10);
+  return y >= 2020 && y <= (new Date()).getFullYear() + 1;
+}
+
 function jsonOut(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
@@ -146,6 +158,7 @@ function doPost(e) {
         var off = EDIT_START; // 7
         var changedIndices = [];
         var mismatched = [];
+        var badDates = [];
         rows.forEach(function(r) {
           var idx = rowMap[String(r.rowId)];
           if (idx === undefined) return;
@@ -167,7 +180,10 @@ function doPost(e) {
           if (r.pct     !== undefined) { allValues[idx][C.PCT      - off] = r.pct === '' || r.pct === undefined ? '' : safeCell_(r.pct); anyChange = true; }
           if (r.comment !== undefined) { allValues[idx][C.COMMENT  - off] = safeCell_(r.comment); anyChange = true; }
           if (r.org     !== undefined) { allValues[idx][C.ORG      - off] = safeCell_(r.org);     anyChange = true; }
-          if (r.dateEnd !== undefined) { allValues[idx][C.DATE_END - off] = safeCell_(r.dateEnd); anyChange = true; }
+          if (r.dateEnd !== undefined) {
+            if (dateOk_(r.dateEnd)) { allValues[idx][C.DATE_END - off] = safeCell_(r.dateEnd); anyChange = true; }
+            else badDates.push(String(r.rowId));
+          }
           if (r.author)                  allValues[idx][C.AUTHOR   - off] = safeCell_(r.author);
           // DATE_CHG только если действительно что-то изменилось
           if (anyChange) allValues[idx][C.DATE_CHG - off] = nowStr;
@@ -192,7 +208,7 @@ function doPost(e) {
       } finally {
         lock.releaseLock();
       }
-      return jsonOut({ok: true, saved: changedIndices.length, requested: rows.length, mismatched: mismatched});
+      return jsonOut({ok: true, saved: changedIndices.length, requested: rows.length, mismatched: mismatched, badDates: badDates});
     }
 
     if (body.action === 'addTask') {
@@ -381,7 +397,10 @@ function saveOneRow(data) {
   var off = EDIT_START; // 7 — смещение: индекс в rowValues = C.X - off
   var anyChange = false;
   if (data.status  !== undefined) { rowValues[C.STATUS   - off] = safeCell_(data.status);  anyChange = true; }
-  if (data.dateEnd !== undefined) { rowValues[C.DATE_END - off] = safeCell_(data.dateEnd); anyChange = true; }
+  if (data.dateEnd !== undefined) {
+    if (!dateOk_(data.dateEnd)) throw new Error('Недопустимый год в дате: ' + data.dateEnd);
+    rowValues[C.DATE_END - off] = safeCell_(data.dateEnd); anyChange = true;
+  }
   if (data.pct     !== undefined) { rowValues[C.PCT      - off] = data.pct === '' || data.pct === undefined ? '' : safeCell_(data.pct); anyChange = true; }
   if (data.org     !== undefined) { rowValues[C.ORG      - off] = safeCell_(data.org);     anyChange = true; }
   if (data.comment !== undefined) { rowValues[C.COMMENT  - off] = safeCell_(data.comment); anyChange = true; }
@@ -409,7 +428,7 @@ function saveRowsBatch(rows) {
 
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
-  var saved = 0, mismatched = [];
+  var saved = 0, mismatched = [], badDates = [];
   try {
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return {ok: true, saved: 0, requested: rows.length};
@@ -448,7 +467,10 @@ function saveRowsBatch(rows) {
       var rowValues = sheet.getRange(sheetRow, EDIT_START, 1, EDIT_COLS).getValues()[0];
       var anyChange = false;
       if (data.status  !== undefined) { rowValues[C.STATUS   - off] = safeCell_(data.status);  anyChange = true; }
-      if (data.dateEnd !== undefined) { rowValues[C.DATE_END - off] = safeCell_(data.dateEnd); anyChange = true; }
+      if (data.dateEnd !== undefined) {
+        if (dateOk_(data.dateEnd)) { rowValues[C.DATE_END - off] = safeCell_(data.dateEnd); anyChange = true; }
+        else badDates.push(String(data.rowId));
+      }
       if (data.pct     !== undefined) { rowValues[C.PCT      - off] = data.pct === '' || data.pct === undefined ? '' : safeCell_(data.pct); anyChange = true; }
       if (data.org     !== undefined) { rowValues[C.ORG      - off] = safeCell_(data.org);     anyChange = true; }
       if (data.comment !== undefined) { rowValues[C.COMMENT  - off] = safeCell_(data.comment); anyChange = true; }
@@ -469,7 +491,7 @@ function saveRowsBatch(rows) {
   } finally {
     lock.releaseLock();
   }
-  return {ok: true, saved: saved, requested: rows.length, mismatched: mismatched};
+  return {ok: true, saved: saved, requested: rows.length, mismatched: mismatched, badDates: badDates};
 }
 
 function findSheet(ss) {
