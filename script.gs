@@ -4,7 +4,7 @@
 
 const SHEET_NAME = 'СБ3_ОБЩАЯ';
 const ADMIN_PASSWORD = 'adminACCB3';
-const SK_PASSWORD    = 'priemkaCB3';
+// Роль «СК» (стройконтроль) убрана решением владельца 2026-09-15: её пароль больше не даёт роль.
 const TASKS_SHEET    = 'Поручения';
 const PROTOCOLS_SHEET = 'Протоколы';
 const PRESETS_SHEET  = 'Пресеты';
@@ -85,10 +85,25 @@ function doGet(e) {
     if (action === 'getSysPresets')       return jsonOut(getSysPresets());
 
 
+    // Свежий пропуск портала на 30 дней (страница на sb3.acons.space просит раз в сутки)
+    if (action === 'portalRenew') {
+      if (!p.pp) return jsonOut({ok: false, error: 'not_portal'});
+      var whoR = portalWho_(p.pp);
+      if (!whoR) return jsonOut({ok: false, error: 'bad_pass'});
+      return jsonOut(portalRenew_(whoR));
+    }
+
     if (action === 'checkPassword') {
+      // Пропуск портала (2026-09-15): роль «администратор» = вход администратора
+      if (p.pp) {
+        var whoC = portalWho_(p.pp);
+        if (!whoC) return jsonOut({ok: false, error: 'bad_pass'});
+        if (whoC.role === PORTAL_ADMIN_ROLE) return jsonOut({ok: true, role: 'admin', fio: whoC.fio});
+        return jsonOut({ok: false, role: whoC.role});
+      }
       var pwd = p.pwd || '';
       if (pwd === ADMIN_PASSWORD) return jsonOut({ok: true, role: 'admin'});
-      if (pwd === SK_PASSWORD)    return jsonOut({ok: true, role: 'sk'});
+      // Пароль СК роль больше не даёт (роль убрана 2026-09-15) — отказ как неверный пароль
       return jsonOut({ok: false});
     }
 
@@ -107,6 +122,23 @@ function doGet(e) {
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
+
+    // Пропуск портала acons.space (2026-09-15): пришло поле `pp` — проверяем его ДО всего остального.
+    // Все POST-действия — запись, поэтому нужен годный пропуск с ролью «администратор»;
+    // иначе (подпись/срок/роль снята/роль «просмотр») — bad_pass, ничего не пишем.
+    // Годный пропуск: права администратора и автор = ФИО из пропуска (имя с клиента не используется).
+    // Без `pp` — всё ровно как раньше (пароль администратора / запись клеток без пароля).
+    var portal = null;
+    if (body.pp) {
+      portal = portalWho_(body.pp);
+      if (!portal || portal.role !== PORTAL_ADMIN_ROLE) return jsonOut({ok: false, error: 'bad_pass'});
+      var portalAuthor = portal.fio || portal.login;
+      body.author = portalAuthor;
+      if (Array.isArray(body.rows)) {
+        body.rows.forEach(function(r) { if (r && typeof r === 'object') r.author = portalAuthor; });
+      }
+    }
+    var isAdmin = !!portal || body.pwd === ADMIN_PASSWORD;
 
     if (body.action === 'saveRow') {
       saveOneRow(body);
@@ -212,51 +244,51 @@ function doPost(e) {
     }
 
     if (body.action === 'addTask') {
-      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      if (!isAdmin) return jsonOut({error: 'Нет прав'});
       return jsonOut(addTask(body));
     }
 
     if (body.action === 'addTasks') {
-      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      if (!isAdmin) return jsonOut({error: 'Нет прав'});
       return jsonOut(addTasks(body));
     }
 
     if (body.action === 'updateTask') {
-      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      if (!isAdmin) return jsonOut({error: 'Нет прав'});
       return jsonOut(updateTask(body));
     }
 
     if (body.action === 'saveProtocol') {
-      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      if (!isAdmin) return jsonOut({error: 'Нет прав'});
       return jsonOut(saveProtocol(body));
     }
 
     if (body.action === 'sendProtocol') {
-      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      if (!isAdmin) return jsonOut({error: 'Нет прав'});
       return jsonOut(sendProtocol(body));
     }
 
     // Текстовое уведомление в Telegram-чат (запрос актуализации данных и т.п.)
     if (body.action === 'sendTgNotify') {
-      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      if (!isAdmin) return jsonOut({error: 'Нет прав'});
       return jsonOut(sendTgNotify(body));
     }
 
     // Системные пресеты фильтров — менять может только админ
     if (body.action === 'saveSysPreset') {
-      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      if (!isAdmin) return jsonOut({error: 'Нет прав'});
       return jsonOut(saveSysPreset(body));
     }
 
     if (body.action === 'deleteSysPreset') {
-      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      if (!isAdmin) return jsonOut({error: 'Нет прав'});
       return jsonOut(deleteSysPreset(body));
     }
 
     // Разовая настройка Telegram: токен бота и id чата пишутся в Script Properties
     // (в коде секретов нет — репозиторий публичный)
     if (body.action === 'setTgConfig') {
-      if (body.pwd !== ADMIN_PASSWORD) return jsonOut({error: 'Нет прав'});
+      if (!isAdmin) return jsonOut({error: 'Нет прав'});
       var props = PropertiesService.getScriptProperties();
       if (body.token)  props.setProperty('TG_BOT_TOKEN', String(body.token).trim());
       if (body.chatId) props.setProperty('TG_CHAT_ID', String(body.chatId).trim());
@@ -979,6 +1011,115 @@ function saveProtocol(body) {
   SpreadsheetApp.flush();
   return {ok: true, num: num};
 }
+
+// ───────────── Вход через портал acons.space (2026-09-15, acons-server/TZ.md §15 шаг 1) ─────────────
+// Страница на sb3.acons.space получает от портала подписанный пропуск ?p= и шлёт его в бэк
+// параметром/полем `pp` (`t=` в СБ3 — метка против кэша, `p` не используем). Копия схемы Отделки:
+//   1. checkPortalPass_ — подпись HMAC-SHA256 общим секретом PORTAL_SECRET, код админки 'sb3', срок, роль;
+//   2. portalLive_ — живая сверка с сервером портала (роль могли снять), кэш 5 минут;
+//      сервер не ответил → доверяем пропуску (сбой портала не должен выбрасывать людей).
+// Роли: «администратор» — права администратора, «просмотр» — только чтение (как без входа).
+// Подрядчики по ?contractor= и чтение без входа не меняются (перевод подрядчиков — §14, позже).
+// Кэш plive_<логин> — служебный (права, 5 мин), в clearCache() НЕ добавляется: иначе каждая
+// запись сбрасывала бы его и дёргала сервер портала заново.
+// Script Property PORTAL_SECRET (тот же, что у портала) задаёт владелец вручную.
+var PORTAL_APP = 'sb3';
+var PORTAL_ADMIN_ROLE = 'администратор';
+var PORTAL_ROLES = ['администратор', 'просмотр'];
+var PORTAL_PASS_TTL_SEC = 30 * 86400;
+var PORTAL_RECHECK_SEC = 300;
+var PORTAL_CHECK_URL = 'https://acons.space/api/portal/check';
+
+/** Пропуск подлинный и роль на портале не снята → {login, fio, role}; иначе null. */
+function portalWho_(pp) {
+  var pass = checkPortalPass_(pp, PORTAL_APP, PORTAL_ROLES);
+  if (!pass) return null;
+  var login = String(pass.login || '').trim().toLowerCase();
+  if (!login) return null;
+  var live = portalLive_(login);
+  if (live && !live.role) return null;   // отключён, срок вышел или роль в СБ3 снята
+  var role = String((live && live.role) || pass.role || '').trim().toLowerCase();
+  if (PORTAL_ROLES.indexOf(role) < 0) return null;
+  return { login: login, fio: String((live && live.fio) || pass.fio || '').trim(), role: role };
+}
+
+/**
+ * Текущая роль человека в СБ3 по данным сервера портала acons.space, кэш 5 минут.
+ * {role, fio}: role '' — доступа нет; null — сервер не ответил (пускаем по пропуску).
+ * Запрос подписан PORTAL_SECRET: sig = hex(HMAC-SHA256('логин|sb3|ts')), ts — unix-секунды.
+ */
+function portalLive_(login) {
+  login = String(login || '').trim().toLowerCase();
+  var cache = CacheService.getScriptCache();
+  var key = 'plive_' + Utilities.base64EncodeWebSafe(login);
+  var c = cache.get(key);
+  if (c) return c === 'err' ? null : JSON.parse(c);
+  try {
+    var ts = String(Math.floor(Date.now() / 1000));
+    var sig = Utilities.computeHmacSha256Signature(login + '|' + PORTAL_APP + '|' + ts, secret_())
+      .map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
+    var url = PORTAL_CHECK_URL + '?login=' + encodeURIComponent(login) + '&app=' + PORTAL_APP +
+              '&ts=' + ts + '&sig=' + sig;
+    var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+    if (resp.getResponseCode() !== 200) throw new Error('сервер портала: HTTP ' + resp.getResponseCode());
+    var j = JSON.parse(resp.getContentText());
+    if (!j.ok) throw new Error('сервер портала: ' + j.error);
+    var role = String(j.role || '').trim().toLowerCase();
+    var res = { role: PORTAL_ROLES.indexOf(role) >= 0 ? role : '', fio: String(j.fio || '') };
+    cache.put(key, JSON.stringify(res), PORTAL_RECHECK_SEC);
+    return res;
+  } catch (e) {
+    cache.put(key, 'err', 60);   // не долбим сервер при сбое, через минуту попробуем снова
+    return null;
+  }
+}
+
+/**
+ * ЗАПУСТИТЬ ОДИН РАЗ В РЕДАКТОРЕ (владелец) перед выкладкой входа через портал: Google спросит
+ * разрешение «подключаться к внешним сервисам» — нажать «Разрешить». В журнале должен появиться
+ * ответ сервера с "ok": true. (UrlFetchApp в СБ3 уже используется для Telegram, но адрес портала
+ * лучше проверить.)
+ */
+function authorizeServer() {
+  var r = UrlFetchApp.fetch('https://acons.space/api/portal?action=ping', { muteHttpExceptions: true });
+  Logger.log('Сервер портала ответил: HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 120));
+}
+
+/** Свежий пропуск на 30 дней с текущими ролью и ФИО — страница просит раз в сутки. */
+function portalRenew_(who) {
+  var now = Math.floor(Date.now() / 1000);
+  var payload = JSON.stringify({ l: who.login, n: who.fio, a: PORTAL_APP, r: who.role,
+                                 exp: now + PORTAL_PASS_TTL_SEC, iat: now });
+  var p = b64url_(Utilities.newBlob(payload).getBytes()) + '.' +
+          b64url_(Utilities.computeHmacSha256Signature(payload, secret_()));
+  return { ok: true, p: p, role: who.role, fio: who.fio };
+}
+
+/** Проверка пропуска — копия эталона из Портал_acons/Code.gs. {login, fio, role} или null. */
+function checkPortalPass_(p, myCode, allowedRoles) {
+  try {
+    var parts = String(p || '').split('.');
+    if (parts.length !== 2) return null;
+    var b64 = parts[0];
+    while (b64.length % 4) b64 += '=';
+    var payload = Utilities.newBlob(Utilities.base64DecodeWebSafe(b64)).getDataAsString();
+    // Подпись «как у Google»: computeHmacSha256Signature(строка, строка) — сервер портала считает так же
+    var sig = b64url_(Utilities.computeHmacSha256Signature(payload, secret_()));
+    if (sig !== parts[1]) return null;
+    var d = JSON.parse(payload);
+    if (d.a !== myCode || !d.exp || d.exp < Math.floor(Date.now() / 1000)) return null;
+    if (allowedRoles && allowedRoles.indexOf(String(d.r || '').trim().toLowerCase()) < 0) return null;
+    return { login: d.l, fio: d.n, role: d.r };
+  } catch (e) { return null; }
+}
+
+function secret_() {
+  var s = PropertiesService.getScriptProperties().getProperty('PORTAL_SECRET');
+  if (!s) throw new Error('PORTAL_SECRET не задан в свойствах скрипта');
+  return s;
+}
+
+function b64url_(bytes) { return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, ''); }
 
 function clearCache() {
   try {

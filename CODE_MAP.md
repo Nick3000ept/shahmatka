@@ -18,7 +18,8 @@
 - `FPROTOCOL` — bool, чекбокс «Протокол»: строки с ручной dateEnd в ближайшие 7 дней, статус не «окончены»/«на площадке» (те же правила, что в формировании протокола)
 - `SHOW_VOL` / `SHOW_CL` / `SHOW_SP` — режимы содержимого ячеек: объёмы / чек-листы / подрядчик
 - `SHOW_FLATS` / `FLATS` — чекбокс «Квартиры» (2026-08-04): счётчики отделки по корпусу+этажу из листа «Квартиры» (null = не загружены, `loadFlats`)
-- `ADMIN_PWD` — пароль админа в sessionStorage `sb3_admin_pwd` (для POST поручений/протокола); `IS_SK` — роль стройконтроля
+- `ADMIN_PWD` — пароль админа в sessionStorage `sb3_admin_pwd` (для POST поручений/протокола; на `*.acons.space` всегда пусто). Роль СК (`IS_SK`) удалена 2026-09-15
+- `PORTAL_MODE` / `PORTAL_PASS` / `PORTAL_URL` / `PORTAL_PASS_KEY` (`sb3_pass`) — вход через портал acons.space (2026-09-15, блок перед «РОЛИ», ~стр. 920–978); см. раздел «Вход через портал» ниже
 - `ANALYTICS_OPEN` — bool, панель аналитики открыта
 - `AN_UNIT` — единица счёта аналитики: `'fl'` этажи (по умолчанию) / `'kv'` квартиры
 - `COL_KEYS[]` — порядок столбцов: `{corpus, place, lvl2, work, extra1, key, factNum}`.
@@ -36,7 +37,7 @@
 - `ZOOM` — текущий масштаб (10–150%)
 - `AUTHOR` — имя пользователя для сохранения
 - `CONTRACTOR` — имя подрядчика из URL-параметра `?contractor=`
-- `IS_ADMIN` — флаг администратора (из sessionStorage после ввода пароля)
+- `IS_ADMIN` — флаг администратора: на github.io — из sessionStorage после ввода пароля; на `*.acons.space` — из пропуска портала с ролью `администратор`
 - `PRESETS{}` — пресеты фильтров из localStorage (`sb3_presets`)
 - `ACTIVE_PRESET` — имя активного пресета или `'__none__'` (Без фильтров) или `null`
 
@@ -124,10 +125,23 @@
 - `clearSel()` — сбрасывает SEL, обновляет визуал и msbar
 - `updateCellSel()` — синхронизирует CSS-классы sel/row-sel/col-sel с SET SEL
 
-### Пароль администратора
-- `openPwdModal(callback)` — показывает модальное окно ввода пароля
+### Пароль администратора (~стр. 2584–2700)
+- `applyRoleUI()` — показывает/скрывает `.admin-only` по `IS_ADMIN`; элемент помечается `data-admin-only`, чтобы скрытие можно было вернуть при выходе из режима администратора
+- `openPwdModal(callback)` — показывает модальное окно ввода пароля; на `*.acons.space` с пропуском без роли администратор — только подсказка «роль просмотр»
 - `closePwdModal()` — скрывает модальное окно
-- `submitPwd()` — отправляет пароль в GAS checkPassword, при успехе ставит IS_ADMIN=true в sessionStorage
+- `submitPwd()` — отправляет пароль в GAS checkPassword; режим администратора — только при `role==='admin'` (роль СК убрана 2026-09-15); на `*.acons.space` не работает
+
+### Вход через портал acons.space (2026-09-15; всё — только при `PORTAL_MODE`)
+- Чистые функции (~стр. 930–950, тесты берут их прямо из index.html): `isPortalHost(h)` — адрес `*.acons.space`; `passInfo(p)` — содержимое пропуска `{l,n,a,r,exp,iat}`; `passUsable(info,nowSec)` — код `sb3`, логин, срок; `passIsAdmin(info)` — роль `администратор`; `passNeedsRenew(info,nowSec)` — выдан больше суток назад; `searchWithoutPass(search)` — строка запроса без `p`
+- `takePassFromUrl` (IIFE) — `?p=` → localStorage `sb3_pass` → убрать из адреса; просроченный/чужой пропуск забывается
+- `forgetPortalPass()` — стереть пропуск
+- `portalPP()` — пропуск для поля `pp` (только портал + администратор, иначе `undefined` — поле не уходит); стоит во всех `pwd:ADMIN_PWD, pp:portalPP()` и в `batchSave`
+- `hasAdminAuth()` — есть пароль (github.io) или пропуск администратора (портал); заменил проверки `if(!ADMIN_PWD)`
+- `applyPortalUI()` — ссылка «← Портал» и «Выйти» при пропуске; у администратора `AUTHOR` = ФИО из пропуска, `#author-inp` только для чтения; окно входа → «Войти через портал»
+- `portalSeen(j)` — вызывается в `fetchJson` и после разбора ответа `sendTgNotify`/`sendProtocol`: `error:'bad_pass'` → `portalPassRejected()`
+- `portalPassRejected()` — забыть пропуск, `IS_ADMIN=false`, перерисовать, сообщение; на портал сама не переходит
+- `renewPass()` — GET `portalRenew&pp=` раз в сутки (вызов при открытии и раз в час из `window.onload`); роль в новом пропуске могла смениться → `IS_ADMIN`
+- `portalLogout()` — кнопка «Выйти»: забыть пропуск → `https://acons.space`
 
 ### Мультиредактирование — нижняя панель msbar
 - `updateMsBar()` — показывает/скрывает #msbar (при SEL.size > 1)
@@ -150,7 +164,7 @@
 
 ### Сохранение в Google Sheets
 - `updateSaveBtn()` — показывает/скрывает кнопку "Сохранить всё" и бейдж
-- `batchSave(rowIds)` — отправляет изменения из MOD в GAS: ≤20 строк → параллельные saveRow, >20 → saveAll; при нечитаемом ответе показывает предупреждение; при `saved < requested` (saveAll) предупреждает о ненайденных строках
+- `batchSave(rowIds)` — отправляет изменения из MOD в GAS одним запросом: ≤50 строк → `saveRows`, больше → `saveAll`; при нечитаемом ответе показывает предупреждение; при `saved < requested` предупреждает о ненайденных строках; на `*.acons.space` у администратора добавляет `pp` (бэк ставит автором ФИО из пропуска)
 - `saveAll()` — проверяет AUTHOR, берёт все ключи MOD → batchSave
 
 ### Экспорт (кнопка «⬇ Экспорт» в topbar, 2026-08-12)
@@ -248,7 +262,9 @@
 - `#p-date` / `#p-comment` / `#p-contractor` — поля попапа
 - `#sb-total` / `#sb-done` / `#sb-left` / `#sb-start` / `#sb-rem` — счётчики статусбара
 - `#ubadge` / `#save-all-btn` — бейдж несохранённых и кнопка сохранить всё
-- `#author-inp` — поле имени автора (в topbar, рядом с кнопкой аналитики)
+- `#author-inp` — поле имени автора (в topbar, рядом с кнопкой аналитики); у администратора по пропуску портала — ФИО, только для чтения
+- `#portal-back` / `#portal-logout` — «← Портал acons.space» (после логотипа) и «Выйти» (после имени); видны только при пропуске на `*.acons.space`
+- `#pwd-sub` / `#pwd-ok` / `#pwd-portal` — подпись, кнопка «Войти» и ссылка «Войти через портал» в окне входа (на `*.acons.space` видна только ссылка)
 - `#an-btn` — кнопка «📊 Аналитика» в topbar (`.btn-pri` когда панель открыта)
 - `#exp-btn` / `#exp-menu` — кнопка «⬇ Экспорт» в topbar и её меню (Excel / PDF)
 - `#notif-btn` — кнопка «🔔 Уведомления» в topbar (admin-only; **пока скрыта** `display:none`, 2026-08-04)

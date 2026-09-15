@@ -186,6 +186,73 @@ test('числовая сортировка extra1 (Шахта 2 < Шахта 10
   assert.strictEqual(keys[0].extra1, 'Шахта 2');
 });
 
+// ── Вход через портал acons.space (2026-09-15) ───────────────────
+// Эти функции НЕ копируются руками, а вырезаются из index.html по имени — тест проверяет
+// именно тот код, что уйдёт на сайт.
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const PAGE = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+function pageFunction(name) {
+  const start = PAGE.indexOf('function ' + name + '(');
+  if (start < 0) throw new Error('В index.html нет функции ' + name);
+  let depth = 0, i = PAGE.indexOf('{', start);
+  for (; i < PAGE.length; i++) {
+    if (PAGE[i] === '{') depth++;
+    else if (PAGE[i] === '}' && --depth === 0) break;
+  }
+  return PAGE.slice(start, i + 1);
+}
+['isPortalHost', 'passInfo', 'passUsable', 'passIsAdmin', 'passNeedsRenew', 'searchWithoutPass']
+  .forEach(n => vm.runInThisContext(pageFunction(n)));
+
+// Пропуск как у портала: base64url(JSON) + '.' + подпись (подпись страница не проверяет)
+function makePass(obj) { return Buffer.from(JSON.stringify(obj), 'utf8').toString('base64url') + '.sig'; }
+const NOW = 1_800_000_000;
+
+section('isPortalHost — режим портала по адресу');
+test('sb3.acons.space → портал', () => assert.strictEqual(isPortalHost('sb3.acons.space'), true));
+test('acons.space → портал', () => assert.strictEqual(isPortalHost('acons.space'), true));
+test('SB3.ACONS.SPACE (регистр) → портал', () => assert.strictEqual(isPortalHost('SB3.ACONS.SPACE'), true));
+test('nick3000ept.github.io → НЕ портал (всё как раньше)', () => assert.strictEqual(isPortalHost('nick3000ept.github.io'), false));
+test('localhost / пусто → НЕ портал', () => { assert.strictEqual(isPortalHost('localhost'), false); assert.strictEqual(isPortalHost(''), false); });
+test('подделка acons.space.evil.ru → НЕ портал', () => assert.strictEqual(isPortalHost('acons.space.evil.ru'), false));
+test('подделка notacons.space → НЕ портал', () => assert.strictEqual(isPortalHost('notacons.space'), false));
+
+section('passInfo — разбор пропуска');
+test('кириллица в ФИО и роли читается', () => {
+  const i = passInfo(makePass({ l: 'ivanov', n: 'Иванов Иван', a: 'sb3', r: 'администратор', exp: NOW + 10, iat: NOW }));
+  assert.strictEqual(i.n, 'Иванов Иван');
+  assert.strictEqual(i.r, 'администратор');
+});
+test('мусор → null', () => { assert.strictEqual(passInfo('%%%.x'), null); assert.strictEqual(passInfo(''), null); assert.strictEqual(passInfo(null), null); });
+
+section('passUsable / passIsAdmin / passNeedsRenew');
+const adm = { l: 'ivanov', n: 'Иванов', a: 'sb3', r: 'администратор', exp: NOW + 100, iat: NOW - 10 };
+test('годный пропуск СБ3', () => assert.strictEqual(passUsable(adm, NOW), true));
+test('просроченный → не годен', () => assert.strictEqual(passUsable(Object.assign({}, adm, { exp: NOW - 1 }), NOW), false));
+test('пропуск другой админки (otdelka) → не годен', () => assert.strictEqual(passUsable(Object.assign({}, adm, { a: 'otdelka' }), NOW), false));
+test('без логина или срока → не годен', () => {
+  assert.strictEqual(passUsable(Object.assign({}, adm, { l: '' }), NOW), false);
+  assert.strictEqual(passUsable(Object.assign({}, adm, { exp: 0 }), NOW), false);
+  assert.strictEqual(passUsable(null, NOW), false);
+});
+test('роль администратор → админ', () => assert.strictEqual(passIsAdmin(adm), true));
+test('роль просмотр → не админ', () => assert.strictEqual(passIsAdmin(Object.assign({}, adm, { r: 'просмотр' })), false));
+test('роль СК / пусто → не админ', () => { assert.strictEqual(passIsAdmin({ r: 'sk' }), false); assert.strictEqual(passIsAdmin(null), false); });
+test('выдан меньше суток назад → не продлевать', () => assert.strictEqual(passNeedsRenew(adm, NOW), false));
+test('выдан больше суток назад → продлить', () => assert.strictEqual(passNeedsRenew(Object.assign({}, adm, { iat: NOW - 86401 }), NOW), true));
+test('нет iat → продлить', () => assert.strictEqual(passNeedsRenew({ l: 'x' }, NOW), true));
+
+section('searchWithoutPass — убрать ?p= из адреса');
+test('только p → пустая строка', () => assert.strictEqual(searchWithoutPass('?p=abc.def'), ''));
+test('p и contractor → contractor остаётся', () => {
+  const s = searchWithoutPass('?p=abc.def&contractor=' + encodeURIComponent('Топ ИД'));
+  assert.strictEqual(new URLSearchParams(s).get('contractor'), 'Топ ИД');
+  assert.strictEqual(new URLSearchParams(s).has('p'), false);
+});
+test('нет p → null (адрес не трогаем)', () => { assert.strictEqual(searchWithoutPass('?contractor=X'), null); assert.strictEqual(searchWithoutPass(''), null); });
+
 // ── ИТОГ ─────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(40)}`);
 console.log(`Итого: ${passed + failed} тестов — ${passed} прошло, ${failed} упало`);
