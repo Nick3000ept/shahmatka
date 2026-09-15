@@ -1146,7 +1146,7 @@ async function loadContractors(){
   var cached=localStorage.getItem('sb3_contractors');
   if(cached){try{CONTRACTORS=JSON.parse(cached);renderContractorSelect('');}catch(ex){}}
   try{
-    var r=await fetch(BASE+'?action=getContractors&t='+Date.now());
+    var r=await gasFetch(BASE+'?action=getContractors&t='+Date.now());
     var j=JSON.parse(await r.text());
     if(j.contractors&&j.contractors.length){
       CONTRACTORS=j.contractors;
@@ -1174,6 +1174,88 @@ function renderContractorSelect(selected){
 
 function reload(){if(BASE)loadData();else toast('Сначала подключитесь','err');}
 
+// ─── ДАННЫЕ ЧЕРЕЗ СЕРВЕР acons.space (2026-09-15, acons-server/TZ.md §15 шаг 3) ───
+// Только при PORTAL_MODE (*.acons.space): каждый запрос к Google (адрес BASE — чтение и запись)
+// уходит на свой адрес /api/sb3. Сервер отдаёт копии данных мгновенно, а запись пересылает в Google
+// и сразу обновляет у себя затронутые строки. На github.io gasFetch — обычный fetch: всё как раньше.
+// Запасной путь в Google: ЧТЕНИЕ — если сервер не ответил, ответил не 2xx, HTML-страницей или сам
+// сообщил о сбое; ЗАПИСЬ — только если запрос точно не дошёл до сервера (сеть, 404/405/429/502/503,
+// not_ready/too_large/bad_json). Ответ сервера google_unavailable на запись в Google НЕ повторяем —
+// Google мог записать, повтор задвоил бы поручение.
+var SB3_API='/api/sb3';
+var DATA_SYNCED_AT='';        // время копии шахматки на сервере (X-Synced-At); '' — данные прямо из Google
+var GAS_SRV_DOWN_UNTIL=0;     // сервер недоступен — минуту ходим прямо в Google, не теряя время на ожидание
+// Адрес запроса на сервере для адреса Google, или null (не портал / не адрес Google)
+function gasServerUrl(url,base,portal){
+  if(!portal||!base||typeof url!=='string'||url.indexOf(base)!==0) return null;
+  var rest=url.slice(base.length);
+  if(rest&&rest.charAt(0)!=='?') return null;
+  return SB3_API+rest;
+}
+// HTTP-статусы, при которых запрос не дошёл до службы (адрес не подключён, лимит nginx, служба остановлена)
+function gasSrvUnreached(status){ return status===404||status===405||status===429||status===502||status===503; }
+// Ответ сервера на ЧТЕНИЕ, после которого спрашиваем Google напрямую
+function gasGetNeedsFallback(status,text){
+  if(!(status>=200&&status<300)) return true;
+  var t=String(text||'').trim();
+  if(!t||t.charAt(0)==='<') return true;
+  var j; try{ j=JSON.parse(t); }catch(ex){ return false; }
+  return !!(j&&j.ok===false&&['server_error','google_unavailable','not_ready','not_found','bad_json','too_large'].indexOf(j.error)>=0);
+}
+// Ответ сервера на ЗАПИСЬ, после которого запрос безопасно отправить в Google (сервер его не пересылал)
+function gasPostNotDelivered(status,text){
+  if(gasSrvUnreached(status)) return true;
+  var j; try{ j=JSON.parse(String(text||'')); }catch(ex){ return false; }
+  return !!(j&&j.ok===false&&['not_ready','too_large','bad_json'].indexOf(j.error)>=0);
+}
+// Запись, которую безопасно повторить в Google при обрыве связи с сервером: отметки клеток (повтор пишет те же значения)
+function gasPostRepeatable(opts){
+  var a=''; try{ a=String((JSON.parse(String(opts&&opts.body||''))||{}).action||''); }catch(ex){}
+  return a==='saveRows'||a==='saveAll'||a==='saveRow';
+}
+// «Данные на ЧЧ:ММ» для строки состояния (дата добавляется, если копия не сегодняшняя)
+function syncedLabel(iso,now){
+  if(!iso) return '';
+  var d=new Date(iso); if(isNaN(d.getTime())) return '';
+  var n=now||new Date(), p2=function(x){return x<10?'0'+x:String(x);};
+  var hm=p2(d.getHours())+':'+p2(d.getMinutes());
+  var sameDay=d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate();
+  return ' · данные на '+(sameDay?'':p2(d.getDate())+'.'+p2(d.getMonth()+1)+' ')+hm;
+}
+async function gasFetch(url,opts){
+  var srv=gasServerUrl(url,BASE,PORTAL_MODE);
+  if(!srv) return fetch(url,opts);
+  var isPost=!!(opts&&String(opts.method||'').toUpperCase()==='POST');
+  var isRows=!isPost&&/[?&]action=getRows(&|$)/.test(url);
+  if(Date.now()<GAS_SRV_DOWN_UNTIL){ if(isRows) DATA_SYNCED_AT=''; return fetch(url,opts); }
+  var r, text;
+  try{ r=await fetch(srv,opts); text=await r.text(); }
+  catch(ex){ // сервер вовсе не ответил — запрос до него не дошёл или потерян ответ; минуту дальше — прямо в Google
+    GAS_SRV_DOWN_UNTIL=Date.now()+60000;
+    if(isRows) DATA_SYNCED_AT='';
+    // Запись: сервер мог уже передать её в Google. Повторяем сами только отметки клеток (повтор записывает те же значения);
+    // поручения, протоколы, рассылки — не повторяем (задвоились бы), человек проверит и нажмёт ещё раз (уйдёт в Google).
+    if(isPost&&!gasPostRepeatable(opts)) return new Response(JSON.stringify({ok:false,error:'Сервер не ответил — действие могло выполниться. Обновите страницу и проверьте, прежде чем повторять'}),{status:200,headers:{'Content-Type':'application/json; charset=utf-8'}});
+    return fetch(url,opts);
+  }
+  if(gasSrvUnreached(r.status)) GAS_SRV_DOWN_UNTIL=Date.now()+60000;
+  var ctype=r.headers.get('Content-Type')||'application/json; charset=utf-8';
+  if(isPost){
+    if(gasPostNotDelivered(r.status,text)) return fetch(url,opts);
+    try{
+      var pj=JSON.parse(text);
+      if(pj&&pj.ok===false&&pj.error==='google_unavailable'){
+        pj.error='Google не ответил — изменения могли не сохраниться. Обновите страницу и проверьте, прежде чем повторять (google_unavailable)';
+        text=JSON.stringify(pj);
+      }
+    }catch(ex){}
+    return new Response(text,{status:r.status,statusText:r.statusText,headers:{'Content-Type':ctype}});
+  }
+  if(gasGetNeedsFallback(r.status,text)){ if(isRows) DATA_SYNCED_AT=''; return fetch(url,opts); }
+  if(isRows) DATA_SYNCED_AT=r.headers.get('X-Synced-At')||'';
+  return new Response(text,{status:r.status,statusText:r.statusText,headers:{'Content-Type':ctype}});
+}
+
 // ─── LOAD ─────────────────────────────────────────────────────────
 // fetch с авто-повторами: сетевые ошибки и HTML-ответы GAS повторяем до 3 раз
 // с растущей паузой, и только потом отдаём ошибку наверх
@@ -1182,7 +1264,7 @@ async function fetchJson(url,opts,tries){
   var lastErr;
   for(var i=0;i<tries;i++){
     try{
-      var r=await fetch(url,opts);
+      var r=await gasFetch(url,opts);
       if(!r.ok) throw new Error('HTTP '+r.status);
       var t=await r.text();
       if(t.trim()[0]==='<') throw new Error('HTML_RESPONSE');
@@ -1215,7 +1297,7 @@ async function loadData(){
     }
     ROWS_MAP.clear(); ROWS.forEach(r=>ROWS_MAP.set(r.rowId,r));
     buildFilters();render();
-    setSt('ok','Загружено · '+new Date().toLocaleTimeString('ru')+' · '+ROWS.length+' строк');
+    setSt('ok','Загружено · '+new Date().toLocaleTimeString('ru')+' · '+ROWS.length+' строк'+syncedLabel(DATA_SYNCED_AT));
     toast('Загружено '+ROWS.length+' строк','ok');
   }catch(ex){
     var msg=ex.message==='HTML_RESPONSE'?'Скрипт вернул HTML — попробуйте обновить страницу':ex.message;
@@ -2642,7 +2724,7 @@ async function renewPass(){
   var info=passInfo(PORTAL_PASS);
   if(!passNeedsRenew(info,Date.now()/1000)) return;
   try{
-    var r=await fetch(BASE+'?action=portalRenew&pp='+encodeURIComponent(PORTAL_PASS)+'&t='+Date.now());
+    var r=await gasFetch(BASE+'?action=portalRenew&pp='+encodeURIComponent(PORTAL_PASS)+'&t='+Date.now());
     var j=JSON.parse(await r.text());
     if(j&&j.error==='bad_pass'){ portalPassRejected(); return; }
     var ni=(j&&j.ok&&j.p)?passInfo(j.p):null;
@@ -2681,7 +2763,7 @@ async function submitPwd(){
   if(!pwd) return;
   document.getElementById('pwd-err').textContent='';
   try{
-    var r=await fetch(BASE+'?action=checkPassword&pwd='+encodeURIComponent(pwd)+'&t='+Date.now());
+    var r=await gasFetch(BASE+'?action=checkPassword&pwd='+encodeURIComponent(pwd)+'&t='+Date.now());
     var j=JSON.parse(await r.text());
     // Роль СК убрана (2026-09-15): режим администратора — только при role==='admin'
     // (старый бэк на пароль СК отвечал role:'sk' — такой ответ теперь считается неверным паролем)
@@ -2837,7 +2919,7 @@ async function sendNotifTg(){
   btn.disabled=true;
   setSt('spin','Отправка в Telegram…');
   try{
-    var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+    var r=await gasFetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
       action:'sendTgNotify', pwd:ADMIN_PWD, pp:portalPP(), text:text
     })});
     var j=JSON.parse(await r.text());
@@ -3324,7 +3406,7 @@ async function openSendModal(){
   if(!s.sections.length){ toast('Протокол пуст','inf'); return; }
   var emails=[];
   try{
-    var r=await fetch(BASE+'?action=getContractorEmails&t='+Date.now());
+    var r=await gasFetch(BASE+'?action=getContractorEmails&t='+Date.now());
     var j=JSON.parse(await r.text());
     emails=j.items||[];
   }catch(ex){ toast('Не удалось загрузить адреса','err'); return; }
@@ -3384,7 +3466,7 @@ async function sendProtocolMail(){
   btn.disabled=true;
   setSt('spin','Отправка протокола…');
   try{
-    var r=await fetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+    var r=await gasFetch(BASE,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
       action:'sendProtocol', pwd:ADMIN_PWD, pp:portalPP(), num:s.num, date:s.date, title:s.title,
       preamble:s.preamble, content:s.text, sections:s.sections, recipients:recs, author:AUTHOR, tg:toTg
     })});
@@ -3711,7 +3793,7 @@ function toggleAnDetail(idx){
 // ─── ЧИСЛЕННОСТЬ ──────────────────────────────────────────────────
 function loadStaffing(cb){
   if(STAFFING_DATA.length>0){if(cb)cb();return;}
-  fetch(BASE+'?action=getStaffing')
+  gasFetch(BASE+'?action=getStaffing')
     .then(r=>r.json())
     .then(data=>{STAFFING_DATA=data.items||[];if(cb)cb();})
     .catch(()=>{});
@@ -3909,7 +3991,7 @@ async function loadFlats(){
 function loadCheckLists(){
   if(CHECK_LISTS.length>0){buildClMap();render();return;}
   setSt('spin','Загрузка ЧЛ…');
-  fetch(BASE+'?action=getCheckLists')
+  gasFetch(BASE+'?action=getCheckLists')
     .then(r=>r.json())
     .then(data=>{
       CHECK_LISTS=data.items||[];

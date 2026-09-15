@@ -20,6 +20,7 @@
 - `SHOW_FLATS` / `FLATS` — чекбокс «Квартиры» (2026-08-04): счётчики отделки по корпусу+этажу из листа «Квартиры» (null = не загружены, `loadFlats`)
 - `ADMIN_PWD` — пароль админа в sessionStorage `sb3_admin_pwd` (для POST поручений/протокола; на `*.acons.space` всегда пусто). Роль СК (`IS_SK`) удалена 2026-09-15
 - `PORTAL_MODE` / `PORTAL_PASS` / `PORTAL_URL` / `PORTAL_PASS_KEY` (`sb3_pass`) — вход через портал acons.space (2026-09-15, блок перед «РОЛИ», ~стр. 920–978); см. раздел «Вход через портал» ниже
+- `SB3_API` (`'/api/sb3'`) / `DATA_SYNCED_AT` / `GAS_SRV_DOWN_UNTIL` — данные через сервер acons.space (2026-09-15, ~стр. 1185–1187); см. раздел «Данные через сервер» ниже
 - `ANALYTICS_OPEN` — bool, панель аналитики открыта
 - `AN_UNIT` — единица счёта аналитики: `'fl'` этажи (по умолчанию) / `'kv'` квартиры
 - `COL_KEYS[]` — порядок столбцов: `{corpus, place, lvl2, work, extra1, key, factNum}`.
@@ -55,8 +56,23 @@
 - `loadContractors()` — загружает список подрядчиков из GAS, кэширует в localStorage
 - `renderContractorSelect(selected)` — обновляет `<select#p-contractor>` в попапе
 - `reload()` — вызывает loadData()
-- `loadData()` — главная загрузка: fetch getRows → ROWS → buildFilters() → render()
+- `fetchJson(url, opts, tries)` (~стр. 1262) — до 3 попыток при сетевой ошибке и HTML-ответе; ходит через `gasFetch`; `portalSeen` на каждом ответе
+- `loadData()` (~стр. 1282) — главная загрузка: fetchJson getRows&fmt=2 → ROWS → buildFilters() → render(); строка состояния «Загружено · время · N строк» + `syncedLabel(DATA_SYNCED_AT)` («· данные на ЧЧ:ММ», только если данные с сервера)
 - `loadFlats()` — чекбокс «Квартиры» (`SHOW_FLATS`/`FLATS`, 2026-08-04): лениво грузит `getFlats` (лист «Квартиры» → счётчики отделки по корпусу+этажу); в ячейках MR Base (серый) / Shell+стяжка (фиолетовый #8b5cf6) / Shell (красный), дельта и прогресс-бар скрыты
+
+### Данные через сервер acons.space (~стр. 1177–1257; 2026-09-15, acons-server/TZ.md §15 шаг «скорость»)
+Всё переключение — только при `PORTAL_MODE`; на github.io `gasFetch` = обычный `fetch`. Функции берёт `tests/test.js` прямо из index.html.
+- `gasServerUrl(url, base, portal)` — адрес Google (`BASE` + `?…`) → `/api/sb3?…`; не портал / не адрес Google → `null`
+- `gasSrvUnreached(status)` — 404/405/429/502/503: запрос не дошёл до службы
+- `gasGetNeedsFallback(status, text)` — чтение повторить в Google: не 2xx, пусто/HTML, `ok:false` с `server_error`/`google_unavailable`/`not_ready`/`not_found`/`bad_json`/`too_large`
+- `gasPostNotDelivered(status, text)` — запись безопасно отправить в Google: `gasSrvUnreached` или `not_ready`/`too_large`/`bad_json`. ⚠️ `google_unavailable` сюда не добавлять (Google мог записать)
+- `gasPostRepeatable(opts)` — при обрыве сети запись повторяется в Google только для `saveRows`/`saveAll`/`saveRow`; остальное (поручения, протоколы, рассылки, пресеты) → ответ «Сервер не ответил — действие могло выполниться…»
+- `syncedLabel(iso, now)` — «· данные на ЧЧ:ММ» (с датой, если копия не сегодняшняя); пусто при `''`
+- `gasFetch(url, opts)` — замена `fetch` для всех запросов к `BASE` (9 вызовов: `fetchJson`, `loadContractors`, `renewPass`, `submitPwd`, два POST ~стр. 2922 и 3469, `getContractorEmails`, `getStaffing`, `getCheckLists`): сервер → при сбое Google; обрыв/недоступность → `GAS_SRV_DOWN_UNTIL` на 60 с; для `getRows` пишет `DATA_SYNCED_AT` из заголовка `X-Synced-At`; `google_unavailable` на запись заменяет текстом «Google не ответил — изменения могли не сохраниться…»
+
+### script.gs (только разделы, связанные с сервером)
+- `doGet` ~стр. 65 — `action=getRowsByIds` → `getRowsByIds(p.ids, p.fmt==='2')`
+- `getRowsByIds(idsJson, compact)` ~стр. 403–488 — только чтение: строки по списку rowId (до 1000) в формате `getRows`; ⚠️ копия цикла `getRows` (~стр. 345–401; колонки `ROW_COLS` ~стр. 341)
 
 ### Фильтры
 - `buildFilters()` — строит чипы корпусов + select орг/место/вид работ/группа работ + список работ из ROWS
@@ -125,7 +141,7 @@
 - `clearSel()` — сбрасывает SEL, обновляет визуал и msbar
 - `updateCellSel()` — синхронизирует CSS-классы sel/row-sel/col-sel с SET SEL
 
-### Пароль администратора (~стр. 2584–2700)
+### Пароль администратора (~стр. 2668–2785, вместе с функциями портала на странице)
 - `applyRoleUI()` — показывает/скрывает `.admin-only` по `IS_ADMIN`; элемент помечается `data-admin-only`, чтобы скрытие можно было вернуть при выходе из режима администратора
 - `openPwdModal(callback)` — показывает модальное окно ввода пароля; на `*.acons.space` с пропуском без роли администратор — только подсказка «роль просмотр»
 - `closePwdModal()` — скрывает модальное окно

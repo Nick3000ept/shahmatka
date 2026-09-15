@@ -61,6 +61,8 @@ function doGet(e) {
     var action = p.action || '';
 
     if (action === 'getRows') return jsonOut(getRows(p.corpus || '', p.fmt === '2'));
+    // Только чтение (2026-09-15): строки по списку rowId — сервер acons.space обновляет у себя копию после записи
+    if (action === 'getRowsByIds') return jsonOut(getRowsByIds(p.ids || '', p.fmt === '2'));
     if (action === 'ping')    return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
 
     if (action === 'getContractors') {
@@ -396,6 +398,93 @@ function getRows(filterCorpus, compact) {
     return {cols: ROW_COLS, data: data};
   }
   return {rows: rows};
+}
+
+// ── getRowsByIds — ТОЛЬКО ЧТЕНИЕ (2026-09-15, acons-server/TZ.md §15 шаг 3) ──
+// Те же колонки, обогащение (Факт_работы), пропуск пустых строк и сортировка, что у getRows, но только
+// для переданных rowId (в т.ч. синтетических row_N). Сервер acons.space после записи отметок через него
+// спрашивает фактические значения этих строк и заменяет их в своей копии getRows.
+// ids — JSON-массив rowId (до 1000). Ответ fmt=2: {cols, data, ids}; строк, которых в getRows не было бы
+// (нет rowId / пустой корпус, этаж или работа), в data нет — сервер убирает их из копии.
+// ⚠️ Преобразование строки листа — КОПИЯ цикла getRows: меняете getRows — повторите здесь
+// (tests/test.js сверяет выход getRowsByIds с getRows на одном и том же листе).
+function getRowsByIds(idsJson, compact) {
+  var ids;
+  try { ids = JSON.parse(idsJson || '[]'); } catch (e) { return {error: 'ids: нужен JSON-массив'}; }
+  if (!Array.isArray(ids)) return {error: 'ids: нужен JSON-массив'};
+  var want = {}, wanted = [];
+  ids.forEach(function(id) {
+    var s = String(id == null ? '' : id).trim();
+    if (s && !want[s]) { want[s] = true; wanted.push(s); }
+  });
+  if (wanted.length > 1000) return {error: 'ids: не больше 1000'};
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAME) || findSheet(ss);
+  if (!sheet) return {error: 'Лист не найден'};
+  var lastRow = sheet.getLastRow();
+  var rows = [];
+  if (lastRow >= 2 && wanted.length) {
+    var idCol = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    var idx = [];
+    for (var i = 0; i < idCol.length; i++) {
+      if (want[String(idCol[i][0]).trim() || ('row_' + (i + 2))]) idx.push(i);
+    }
+    var dict = idx.length ? getWorkDict() : {};
+    var k = 0;
+    while (k < idx.length) {
+      // соседние нужные строки (разрыв до 20) читаем одним диапазоном A–T
+      var from = idx[k], to = idx[k], need = {};
+      need[from] = true;
+      while (k + 1 < idx.length && idx[k + 1] - to <= 20) { k++; to = idx[k]; need[to] = true; }
+      k++;
+      var block = sheet.getRange(from + 2, 1, to - from + 1, 20).getValues();
+      for (var b = 0; b < block.length; b++) {
+        var iRow = from + b;
+        if (!need[iRow]) continue;
+        var row = block[b];
+        var corpus = String(row[1]).trim();
+        var floor  = String(row[2]).trim();
+        var work   = String(row[5]).trim();
+        if (!corpus || !floor || !work) continue;
+        var rowId = String(row[0]).trim() || ('row_' + (iRow + 2));
+        var attrs = dict[work] || {place: '', lvl1: '', lvl2: '', kp: '', factNum: ''};
+        rows.push({
+          rowId      : rowId,
+          corpus     : corpus,
+          floor      : parseFloor(floor),
+          work       : work,
+          extra1     : String(row[3]).trim(),
+          org        : String(row[6]).trim(),
+          status     : String(row[7]).trim(),
+          dateEnd    : formatDateOut(row[8]),
+          pct        : String(row[10]).trim(),
+          comment    : String(row[11]).trim(),
+          dateChg    : formatDateOut(row[12]),
+          author     : String(row[13]).trim(),
+          place      : attrs.place,
+          lvl1       : attrs.lvl1,
+          lvl2       : attrs.lvl2,
+          kp         : attrs.kp,
+          factNum    : attrs.factNum,
+          baseDate   : formatDateOut(row[14]),
+          currentDate: formatDateOut(row[15]),
+          volume     : String(row[16]).trim(),
+          unit       : String(row[17]).trim(),
+          idFact     : String(row[19]).trim()
+        });
+      }
+    }
+    rows.sort(function(a, b) {
+      var cc = a.corpus < b.corpus ? -1 : a.corpus > b.corpus ? 1 : 0;
+      return cc !== 0 ? cc : (b.floor || 0) - (a.floor || 0);
+    });
+  }
+  if (compact) {
+    return {cols: ROW_COLS, data: rows.map(function(r) {
+      return ROW_COLS.map(function(k2) { return r[k2]; });
+    }), ids: wanted};
+  }
+  return {rows: rows, ids: wanted};
 }
 
 // Построчное сохранение — для малого числа строк
