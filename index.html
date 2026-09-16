@@ -797,6 +797,17 @@ td.cell.s-empty .c-bar-fill{background:#94a3b8;}
   </div>
 </div>
 
+<!-- Только *.acons.space: владелец закрыл просмотр без входа на портале (checkGuestAccess, 2026-09-16) -->
+<div class="pwd-overlay" id="guest-closed" style="background:var(--bg);z-index:900;">
+  <div class="pwd-box">
+    <div class="pwd-title">Шахматка СБ3</div>
+    <div class="pwd-sub">Просмотр без входа закрыт. Войдите через портал acons.space под своей учётной записью</div>
+    <div class="pwd-btns">
+      <a class="btn btn-pri" href="https://acons.space/?next=sb3" style="text-decoration:none;">Войти через портал</a>
+    </div>
+  </div>
+</div>
+
 <!-- ПАНЕЛЬ ПОРУЧЕНИЙ К ПРОТОКОЛУ (справа) -->
 <div id="prot-panel" class="prot-panel">
   <div class="an-head">
@@ -1117,10 +1128,14 @@ window.onload=function(){
     renewPass();
     setInterval(function(){ if(PORTAL_PASS) renewPass(); },3600000);
   }
-  loadPresets();
-  loadSysPresets();
-  loadData();
-  setTimeout(loadContractors, 1500);
+  // *.acons.space без пропуска и без ?contractor=: сначала спросить портал, открыт ли просмотр без входа
+  checkGuestAccess().then(function(open){
+    if(!open) return;
+    loadPresets();
+    loadSysPresets();
+    loadData();
+    setTimeout(loadContractors, 1500);
+  });
   document.addEventListener('keydown',function(e){
     if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveAll();}
     if(e.key==='Escape'){clearSel(true);closePanel();closeClPanel();}
@@ -2739,6 +2754,27 @@ async function renewPass(){
 function portalLogout(){
   forgetPortalPass();
   location.href=PORTAL_URL;
+}
+// ─── ГОСТЯМ БЕЗ ВХОДА (2026-09-16, переключатель владельца на портале, вкладка «Инструменты») ───
+// Только *.acons.space. Спрашиваем сервер портала лишь у гостя: без пропуска и без ?contractor=
+// (ссылки подрядчиков — старый вход, выключается отдельно). Закрываем ТОЛЬКО по явному ответу
+// {ok:true, data:{guest:''}}; сервер не ответил, ошибся, ответил не тем — показываем как раньше
+// (решение 2026-09-16: сбой связи не должен запирать людей). На github.io не участвует.
+var GUEST_API='/api/portal/guest?app=sb3';
+function guestCheckNeeded(portal,pass,contractor){ return !!portal&&!pass&&!contractor; }
+function guestClosedAnswer(j){ return !!(j&&j.ok===true&&j.data&&j.data.guest===''); }
+async function checkGuestAccess(){
+  if(!guestCheckNeeded(PORTAL_MODE,PORTAL_PASS,CONTRACTOR)) return true;
+  var closed=false;
+  try{
+    var ctl=typeof AbortController==='function'?new AbortController():null;
+    var tm=ctl?setTimeout(function(){ctl.abort();},5000):0;
+    var r=await fetch(GUEST_API+'&t='+Date.now(),ctl?{signal:ctl.signal}:undefined);
+    if(tm) clearTimeout(tm);
+    closed=r.ok&&guestClosedAnswer(JSON.parse(await r.text()));
+  }catch(ex){ closed=false; }
+  if(closed) document.getElementById('guest-closed').classList.add('on');
+  return !closed;
 }
 
 function openPwdModal(callback){

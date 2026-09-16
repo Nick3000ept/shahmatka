@@ -19,8 +19,8 @@
 - `SHOW_VOL` / `SHOW_CL` / `SHOW_SP` — режимы содержимого ячеек: объёмы / чек-листы / подрядчик
 - `SHOW_FLATS` / `FLATS` — чекбокс «Квартиры» (2026-08-04): счётчики отделки по корпусу+этажу из листа «Квартиры» (null = не загружены, `loadFlats`)
 - `ADMIN_PWD` — пароль админа в sessionStorage `sb3_admin_pwd` (для POST поручений/протокола; на `*.acons.space` всегда пусто). Роль СК (`IS_SK`) удалена 2026-09-15
-- `PORTAL_MODE` / `PORTAL_PASS` / `PORTAL_URL` / `PORTAL_PASS_KEY` (`sb3_pass`) — вход через портал acons.space (2026-09-15, блок перед «РОЛИ», ~стр. 920–978); см. раздел «Вход через портал» ниже
-- `SB3_API` (`'/api/sb3'`) / `DATA_SYNCED_AT` / `GAS_SRV_DOWN_UNTIL` — данные через сервер acons.space (2026-09-15, ~стр. 1185–1187); см. раздел «Данные через сервер» ниже
+- `PORTAL_MODE` / `PORTAL_PASS` / `PORTAL_URL` / `PORTAL_PASS_KEY` (`sb3_pass`) — вход через портал acons.space (2026-09-15, блок перед «РОЛИ», ~стр. 932–979); см. раздел «Вход через портал» ниже
+- `SB3_API` (`'/api/sb3'`) / `DATA_SYNCED_AT` / `GAS_SRV_DOWN_UNTIL` — данные через сервер acons.space (2026-09-15, ~стр. 1200–1202); см. раздел «Данные через сервер» ниже
 - `ANALYTICS_OPEN` — bool, панель аналитики открыта
 - `AN_UNIT` — единица счёта аналитики: `'fl'` этажи (по умолчанию) / `'kv'` квартиры
 - `COL_KEYS[]` — порядок столбцов: `{corpus, place, lvl2, work, extra1, key, factNum}`.
@@ -43,7 +43,7 @@
 - `ACTIVE_PRESET` — имя активного пресета или `'__none__'` (Без фильтров) или `null`
 
 ### Инициализация
-- `window.onload` — восстанавливает zoom/автора из localStorage, загружает данные, вешает хоткеи (Ctrl+S, Esc), регистрирует `beforeunload` для защиты несохранённых изменений, вызывает `applyDateLimits()`
+- `window.onload` — восстанавливает zoom/автора из localStorage, на `*.acons.space` у гостя сначала `checkGuestAccess()`, затем загружает данные, вешает хоткеи (Ctrl+S, Esc), регистрирует `beforeunload` для защиты несохранённых изменений, вызывает `applyDateLimits()`
 
 ### Масштаб
 - `changeZoom(delta)` — изменить масштаб на delta%; сохраняет в localStorage
@@ -56,11 +56,11 @@
 - `loadContractors()` — загружает список подрядчиков из GAS, кэширует в localStorage
 - `renderContractorSelect(selected)` — обновляет `<select#p-contractor>` в попапе
 - `reload()` — вызывает loadData()
-- `fetchJson(url, opts, tries)` (~стр. 1262) — до 3 попыток при сетевой ошибке и HTML-ответе; ходит через `gasFetch`; `portalSeen` на каждом ответе
-- `loadData()` (~стр. 1282) — главная загрузка: fetchJson getRows&fmt=2 → ROWS → buildFilters() → render(); строка состояния «Загружено · время · N строк» + `syncedLabel(DATA_SYNCED_AT)` («· данные на ЧЧ:ММ», только если данные с сервера)
+- `fetchJson(url, opts, tries)` (~стр. 1277) — до 3 попыток при сетевой ошибке и HTML-ответе; ходит через `gasFetch`; `portalSeen` на каждом ответе
+- `loadData()` (~стр. 1297) — главная загрузка: fetchJson getRows&fmt=2 → ROWS → buildFilters() → render(); строка состояния «Загружено · время · N строк» + `syncedLabel(DATA_SYNCED_AT)` («· данные на ЧЧ:ММ», только если данные с сервера)
 - `loadFlats()` — чекбокс «Квартиры» (`SHOW_FLATS`/`FLATS`, 2026-08-04): лениво грузит `getFlats` (лист «Квартиры» → счётчики отделки по корпусу+этажу); в ячейках MR Base (серый) / Shell+стяжка (фиолетовый #8b5cf6) / Shell (красный), дельта и прогресс-бар скрыты
 
-### Данные через сервер acons.space (~стр. 1177–1257; 2026-09-15, acons-server/TZ.md §15 шаг «скорость»)
+### Данные через сервер acons.space (~стр. 1192–1272; 2026-09-15, acons-server/TZ.md §15 шаг «скорость»)
 Всё переключение — только при `PORTAL_MODE`; на github.io `gasFetch` = обычный `fetch`. Функции берёт `tests/test.js` прямо из index.html.
 - `gasServerUrl(url, base, portal)` — адрес Google (`BASE` + `?…`) → `/api/sb3?…`; не портал / не адрес Google → `null`
 - `gasSrvUnreached(status)` — 404/405/429/502/503: запрос не дошёл до службы
@@ -68,7 +68,7 @@
 - `gasPostNotDelivered(status, text)` — запись безопасно отправить в Google: `gasSrvUnreached` или `not_ready`/`too_large`/`bad_json`. ⚠️ `google_unavailable` сюда не добавлять (Google мог записать)
 - `gasPostRepeatable(opts)` — при обрыве сети запись повторяется в Google только для `saveRows`/`saveAll`/`saveRow`; остальное (поручения, протоколы, рассылки, пресеты) → ответ «Сервер не ответил — действие могло выполниться…»
 - `syncedLabel(iso, now)` — «· данные на ЧЧ:ММ» (с датой, если копия не сегодняшняя); пусто при `''`
-- `gasFetch(url, opts)` — замена `fetch` для всех запросов к `BASE` (9 вызовов: `fetchJson`, `loadContractors`, `renewPass`, `submitPwd`, два POST ~стр. 2922 и 3469, `getContractorEmails`, `getStaffing`, `getCheckLists`): сервер → при сбое Google; обрыв/недоступность → `GAS_SRV_DOWN_UNTIL` на 60 с; для `getRows` пишет `DATA_SYNCED_AT` из заголовка `X-Synced-At`; `google_unavailable` на запись заменяет текстом «Google не ответил — изменения могли не сохраниться…»
+- `gasFetch(url, opts)` — замена `fetch` для всех запросов к `BASE` (9 вызовов: `fetchJson`, `loadContractors`, `renewPass`, `submitPwd`, два POST ~стр. 2958 и 3505, `getContractorEmails`, `getStaffing`, `getCheckLists`): сервер → при сбое Google; обрыв/недоступность → `GAS_SRV_DOWN_UNTIL` на 60 с; для `getRows` пишет `DATA_SYNCED_AT` из заголовка `X-Synced-At`; `google_unavailable` на запись заменяет текстом «Google не ответил — изменения могли не сохраниться…»
 
 ### script.gs (только разделы, связанные с сервером)
 - `doGet` ~стр. 65 — `action=getRowsByIds` → `getRowsByIds(p.ids, p.fmt==='2')`
@@ -148,7 +148,7 @@
 - `submitPwd()` — отправляет пароль в GAS checkPassword; режим администратора — только при `role==='admin'` (роль СК убрана 2026-09-15); на `*.acons.space` не работает
 
 ### Вход через портал acons.space (2026-09-15; всё — только при `PORTAL_MODE`)
-- Чистые функции (~стр. 930–950, тесты берут их прямо из index.html): `isPortalHost(h)` — адрес `*.acons.space`; `passInfo(p)` — содержимое пропуска `{l,n,a,r,exp,iat}`; `passUsable(info,nowSec)` — код `sb3`, логин, срок; `passIsAdmin(info)` — роль `администратор`; `passNeedsRenew(info,nowSec)` — выдан больше суток назад; `searchWithoutPass(search)` — строка запроса без `p`
+- Чистые функции (~стр. 942–962, тесты берут их прямо из index.html): `isPortalHost(h)` — адрес `*.acons.space`; `passInfo(p)` — содержимое пропуска `{l,n,a,r,exp,iat}`; `passUsable(info,nowSec)` — код `sb3`, логин, срок; `passIsAdmin(info)` — роль `администратор`; `passNeedsRenew(info,nowSec)` — выдан больше суток назад; `searchWithoutPass(search)` — строка запроса без `p`
 - `takePassFromUrl` (IIFE) — `?p=` → localStorage `sb3_pass` → убрать из адреса; просроченный/чужой пропуск забывается
 - `forgetPortalPass()` — стереть пропуск
 - `portalPP()` — пропуск для поля `pp` (только портал + администратор, иначе `undefined` — поле не уходит); стоит во всех `pwd:ADMIN_PWD, pp:portalPP()` и в `batchSave`
@@ -158,6 +158,12 @@
 - `portalPassRejected()` — забыть пропуск, `IS_ADMIN=false`, перерисовать, сообщение; на портал сама не переходит
 - `renewPass()` — GET `portalRenew&pp=` раз в сутки (вызов при открытии и раз в час из `window.onload`); роль в новом пропуске могла смениться → `IS_ADMIN`
 - `portalLogout()` — кнопка «Выйти»: забыть пропуск → `https://acons.space`
+
+### Гостям без входа (2026-09-16; переключатель владельца на портале, сразу после `portalLogout`)
+- `GUEST_API` (`'/api/portal/guest?app=sb3'`)
+- `guestCheckNeeded(portal, pass, contractor)` — спрашивать сервер только на `*.acons.space` без пропуска и без `?contractor=`
+- `guestClosedAnswer(j)` — закрыто только при `{ok:true, data:{guest:''}}`; любой другой ответ = открыто
+- `checkGuestAccess()` — async, вызывается в `window.onload` перед `loadPresets`/`loadSysPresets`/`loadData`/`loadContractors`; ожидание ≤ 5 с; закрыто → `#guest-closed.on`, данные не грузятся
 
 ### Мультиредактирование — нижняя панель msbar
 - `updateMsBar()` — показывает/скрывает #msbar (при SEL.size > 1)
@@ -263,6 +269,7 @@
 - `#empty` — заглушка "нет данных"
 - `#popover` — попап одиночного редактирования
 - `#pwd-overlay` — модальное окно пароля
+- `#guest-closed` — экран «Просмотр без входа закрыт» + «Войти через портал» (классы `.pwd-overlay`/`.pwd-box`, `.on` = показан; 2026-09-16)
 - `#msbar` — нижняя панель мультиредактирования
 - `#fc` — контейнер чипов корпусов
 - `#forg` / `#fplace` / `#flvl1` / `#flvl2` / `#fstatus-sel` — select-фильтры (`#fstatus-sel` — по статусу работы, правее поиска работ)

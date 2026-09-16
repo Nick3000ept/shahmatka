@@ -515,6 +515,61 @@ test('doGet знает getRowsByIds (только чтение, в doPost не �
   assert.strictEqual(/setValue|setValues|appendRow|clear|delete|insertSheet|LockService/.test(fn), false, 'ничего не пишет');
 });
 
+// ── Гостям без входа (2026-09-16): переключатель владельца на портале ──
+section('Гостям без входа — кого спрашивать и когда закрывать');
+['guestCheckNeeded', 'guestClosedAnswer'].forEach(n => vm.runInThisContext(pageFunction(n)));
+test('на странице адрес запроса /api/portal/guest?app=sb3', () =>
+  assert.strictEqual((PAGE.match(/var GUEST_API='([^']+)'/) || [])[1], '/api/portal/guest?app=sb3'));
+test('спрашиваем только гостя на acons.space', () => {
+  assert.strictEqual(guestCheckNeeded(true, '', ''), true);
+  assert.strictEqual(guestCheckNeeded(false, '', ''), false, 'github.io — не спрашиваем');
+  assert.strictEqual(guestCheckNeeded(true, 'pass.sig', ''), false, 'вошёл через портал');
+  assert.strictEqual(guestCheckNeeded(true, '', 'Топ ИД'), false, 'ссылка подрядчика — старый вход');
+});
+test('закрыто только по явному ответу guest:""', () => {
+  assert.strictEqual(guestClosedAnswer({ ok: true, data: { app: 'sb3', guest: '' } }), true);
+  assert.strictEqual(guestClosedAnswer({ ok: true, data: { app: 'sb3', guest: 'просмотр' } }), false);
+  assert.strictEqual(guestClosedAnswer({ ok: false, error: 'not_found' }), false);
+  assert.strictEqual(guestClosedAnswer({ ok: true, data: {} }), false, 'старый сервер без поля');
+  assert.strictEqual(guestClosedAnswer({ ok: true, data: { version: '1', sheets: [] } }), false, 'чужой ответ ping');
+  assert.strictEqual(guestClosedAnswer(null), false);
+});
+function guestSandbox(state, answer) {
+  const calls = [], shown = [];
+  const ctx = vm.createContext({ JSON, Date, setTimeout, clearTimeout, AbortController, Response, console });
+  ctx.fetch = async (url) => { calls.push(url); const a = answer(); if (a instanceof Error) throw a; return new Response(a.body, { status: a.status || 200 }); };
+  ctx.document = { getElementById: () => ({ classList: { add: c => shown.push(c) } }) };
+  vm.runInContext(`var PORTAL_MODE=${state.portal}, PORTAL_PASS='${state.pass || ''}', CONTRACTOR='${state.contractor || ''}', GUEST_API='/api/portal/guest?app=sb3';`, ctx);
+  ['guestCheckNeeded', 'guestClosedAnswer'].forEach(n => vm.runInContext(pageFunction(n), ctx));
+  vm.runInContext(pageAsyncFunction('checkGuestAccess'), ctx);
+  return { ctx, calls, shown };
+}
+atest('гость, просмотр открыт → грузим данные, экрана нет', async () => {
+  const s = guestSandbox({ portal: true }, () => ({ body: '{"ok":true,"data":{"app":"sb3","guest":"просмотр"}}' }));
+  assert.strictEqual(await s.ctx.checkGuestAccess(), true);
+  assert.ok(s.calls[0].startsWith('/api/portal/guest?app=sb3&t='));
+  assert.deepStrictEqual(s.shown, []);
+});
+atest('гость, просмотр закрыт → данные не грузим, экран «Войти через портал»', async () => {
+  const s = guestSandbox({ portal: true }, () => ({ body: '{"ok":true,"data":{"app":"sb3","guest":""}}' }));
+  assert.strictEqual(await s.ctx.checkGuestAccess(), false);
+  assert.deepStrictEqual(s.shown, ['on']);
+});
+atest('сервер не ответил / 502 / HTML → показываем как раньше', async () => {
+  for (const a of [new Error('network'), { status: 502, body: '{"ok":true,"data":{"guest":""}}' }, { body: '<html>' }]) {
+    const s = guestSandbox({ portal: true }, () => a);
+    assert.strictEqual(await s.ctx.checkGuestAccess(), true);
+    assert.deepStrictEqual(s.shown, []);
+  }
+});
+atest('github.io, пропуск портала, ссылка подрядчика → сервер не спрашиваем', async () => {
+  for (const st of [{ portal: false }, { portal: true, pass: 'x.sig' }, { portal: true, contractor: 'Глобал' }]) {
+    const s = guestSandbox(st, () => ({ body: '{"ok":true,"data":{"guest":""}}' }));
+    assert.strictEqual(await s.ctx.checkGuestAccess(), true);
+    assert.strictEqual(s.calls.length, 0);
+  }
+});
+
 // ── ИТОГ ─────────────────────────────────────────────────────────
 (async () => {
   for (const [name, fn] of atests) {
