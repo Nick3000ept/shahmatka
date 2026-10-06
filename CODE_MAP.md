@@ -68,7 +68,7 @@
 - `gasPostNotDelivered(status, text)` — запись безопасно отправить в Google: `gasSrvUnreached` или `not_ready`/`too_large`/`bad_json`. ⚠️ `google_unavailable` сюда не добавлять (Google мог записать)
 - `gasPostRepeatable(opts)` — при обрыве сети запись повторяется в Google только для `saveRows`/`saveAll`/`saveRow`; остальное (поручения, протоколы, рассылки, пресеты) → ответ «Сервер не ответил — действие могло выполниться…»
 - `syncedLabel(iso, now)` — «· данные на ЧЧ:ММ» (с датой, если копия не сегодняшняя); пусто при `''`
-- `gasFetch(url, opts)` — замена `fetch` для всех запросов к `BASE` (9 вызовов: `fetchJson`, `loadContractors`, `renewPass`, `submitPwd`, два POST ~стр. 2958 и 3505, `getContractorEmails`, `getStaffing`, `getCheckLists`): сервер → при сбое Google; обрыв/недоступность → `GAS_SRV_DOWN_UNTIL` на 60 с; для `getRows` пишет `DATA_SYNCED_AT` из заголовка `X-Synced-At`; `google_unavailable` на запись заменяет текстом «Google не ответил — изменения могли не сохраниться…»
+- `gasFetch(url, opts)` — замена `fetch` для всех запросов к `BASE` (8 вызовов: `fetchJson`, `loadContractors`, `renewPass`, `submitPwd`, два POST ~стр. 2958 и 3505, `getContractorEmails`, `getCheckLists`): сервер → при сбое Google; обрыв/недоступность → `GAS_SRV_DOWN_UNTIL` на 60 с; для `getRows` пишет `DATA_SYNCED_AT` из заголовка `X-Synced-At`; `google_unavailable` на запись заменяет текстом «Google не ответил — изменения могли не сохраниться…»
 
 ### script.gs (только разделы, связанные с сервером)
 - `doGet` ~стр. 65 — `action=getRowsByIds` → `getRowsByIds(p.ids, p.fmt==='2')`
@@ -208,10 +208,10 @@
   - Клик по строке работы — вызывает `toggleAnDetail(idx)`
   - Корпуса рендерятся как обычные `<tr class="an-detail an-d-N">`, скрыты по умолчанию
   - Заголовок «Аналитика выполнения» и дата убраны (2026-08-21): в шапке панели остался только ✕, кнопка «📅 Сводная» переехала в строку переключателя единиц (`anUnitToggleHtml()`), подписи у переключателя убраны — только кнопки «Этажи | Квартиры | 📅 Сводная»
-  - **Столбец «%»** (2026-10-06, просьба владельца): правее «Итого» — процент готовности Факт/Итого (`anPctTd()`, рядом с `loadStaffing`); округление вниз, 100% — только когда сделано всё, выделяется зелёным (`.an-pct-full`); у строк корпусов тоже. Итого=0 → «—»
-  - **Раскладка** (2026-08-21): панель `.an-panel` шириной **800px** (было 640; синхронно поменян `padding-right` у `body.analytics-open .board-wrap`); таблица `table-layout:fixed` + `<colgroup>` — числовые колонки 76–86px, вся остальная ширина — названию работы (без colgroup браузер игнорирует width у th). Строки корпусов — тем же шрифтом 22px, что и работы (`.an-detail td`, инлайновый 10px убран). Блок «Численность монтажников» (`buildStaffingHtml()`) — **внизу** панели, после таблицы (у `.staff-section` теперь border-top)
+  - **Столбец «%»** (2026-10-06, просьба владельца): правее «Итого» — процент готовности Факт/Итого (`anPctTd()`); округление вниз, 100% — только когда сделано всё, выделяется зелёным (`.an-pct-full`); у строк корпусов тоже. Итого=0 → «—»
+  - **Раскладка** (2026-08-21): панель `.an-panel` шириной **800px** (было 640; синхронно поменян `padding-right` у `body.analytics-open .board-wrap`); таблица `table-layout:fixed` + `<colgroup>` — числовые колонки 76–86px, вся остальная ширина — названию работы (без colgroup браузер игнорирует width у th). Строки корпусов — тем же шрифтом 22px, что и работы (`.an-detail td`, инлайновый 10px убран). Блок «Численность монтажников» **убран 2026-10-06** (решение владельца: по людям будет отдельный отчёт; бэк-действие `getStaffing` оставлено, страница его не вызывает)
   - Функция охраняется: `if(!ANALYTICS_OPEN) return;`
-  - **Важно:** `pad()` из `script.gs` недоступен в браузере — в `renderSB()`/`buildStaffingHtml()` используется локальная `p2 = function(n){return n<10?'0'+n:String(n);}` 
+  - **Важно:** `pad()` из `script.gs` недоступен в браузере — в `renderSB()` используется локальная `p2 = function(n){return n<10?'0'+n:String(n);}` 
 - `toggleAnDetail(idx)` — показывает/скрывает строки `.an-d-N`, переключает стрелку `.an-arrow` ▸/▾
 - `setAnUnit(u)` / `anUnitToggleHtml()` — переключатель единицы счёта аналитики (этажи/квартиры), см. `renderAnalytics()` выше
 

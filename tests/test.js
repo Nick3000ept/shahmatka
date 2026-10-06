@@ -285,7 +285,7 @@ test('чужой адрес / похожий префикс → null', () => {
 test('на странице не осталось прямых fetch к Google', () => {
   assert.strictEqual(/[^A-Za-z]fetch\(BASE/.test(PAGE), false, 'fetch(BASE… → должно быть gasFetch(BASE…');
   assert.ok(/async function fetchJson[\s\S]{0,300}await gasFetch\(url,opts\)/.test(PAGE), 'fetchJson ходит через gasFetch');
-  assert.ok((PAGE.match(/gasFetch\(BASE/g) || []).length >= 8, 'все прямые запросы переведены');
+  assert.ok((PAGE.match(/gasFetch\(BASE/g) || []).length >= 7, 'все прямые запросы переведены'); // 7 с 2026-10-06: убран getStaffing
 });
 
 section('Когда идти в Google запасным путём');
