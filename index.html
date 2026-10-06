@@ -262,6 +262,7 @@ td.cell.not-mine::after{content:'🔒';position:absolute;top:1px;left:2px;font-s
 .an-table td.r{text-align:right;font-family:var(--mono);font-size:24px;font-weight:600;padding-left:4px;white-space:nowrap;}
 .an-table tr:last-child td{border-bottom:none;}
 .an-num{color:var(--acc);}
+.an-num.an-pct-full{color:#16a34a;font-weight:800;}
 .an-num.zero{color:var(--ink3);font-weight:400;}
 .an-foot{background:var(--bg3)!important;font-weight:700;border-top:2px solid var(--brd2)!important;}
 .an-foot td{border-bottom:none!important;}
@@ -3774,15 +3775,15 @@ function renderAnalytics(){
   }
 
   var h='<table class="an-table">';
-  h+='<colgroup><col><col style="width:76px"><col style="width:82px"><col style="width:76px"><col style="width:86px"></colgroup>';
-  h+='<thead><tr><th>Работа</th><th class="r">7 дн</th><th class="r">30 дн</th><th class="r">Факт</th><th class="r">Итого</th></tr></thead><tbody>';
+  h+='<colgroup><col><col style="width:76px"><col style="width:82px"><col style="width:76px"><col style="width:86px"><col style="width:78px"></colgroup>';
+  h+='<thead><tr><th>Работа</th><th class="r">7 дн</th><th class="r">30 дн</th><th class="r">Факт</th><th class="r">Итого</th><th class="r">%</th></tr></thead><tbody>';
   var curPlace='__NONE__';
   var idx=0;
   works.forEach(w=>{
     var d=byWork[w];
     if(d.place!==curPlace){
       curPlace=d.place;
-      h+='<tr class="an-grp-hdr"><td colspan="5">'+e(curPlace||'Прочее')+'</td></tr>';
+      h+='<tr class="an-grp-hdr"><td colspan="6">'+e(curPlace||'Прочее')+'</td></tr>';
     }
     // Строка работы
     h+='<tr class="an-work-row an-wr-'+idx+'" onclick="toggleAnDetail('+idx+')">';
@@ -3790,7 +3791,7 @@ function renderAnalytics(){
     h+='<td class="r"><span class="an-num'+(d.week===0?' zero':'')+'">'+d.week+'</span></td>';
     h+='<td class="r"><span class="an-num'+(d.month===0?' zero':'')+'">'+d.month+'</span></td>';
     h+='<td class="r"><span class="an-num">'+d.total+'</span></td>';
-    h+='<td class="r"><span class="an-num'+(d.plan===0?' zero':'')+'" style="color:var(--ink3);">'+d.plan+'</span></td></tr>';
+    h+='<td class="r"><span class="an-num'+(d.plan===0?' zero':'')+'" style="color:var(--ink3);">'+d.plan+'</span></td>'+anPctTd(d.total,d.plan)+'</tr>';
     // Строки корпусов (скрыты)
     var corps=Object.keys(d.corpora).sort();
     corps.forEach(c=>{
@@ -3800,7 +3801,7 @@ function renderAnalytics(){
       h+='<td class="r"><span class="an-num'+(cd.week===0?' zero':'')+'">'+cd.week+'</span></td>';
       h+='<td class="r"><span class="an-num'+(cd.month===0?' zero':'')+'">'+cd.month+'</span></td>';
       h+='<td class="r"><span class="an-num'+(cd.total===0?' zero':'')+'">'+cd.total+'</span></td>';
-      h+='<td class="r"><span class="an-num'+(cd.plan===0?' zero':'')+'" style="color:var(--ink3);">'+cd.plan+'</span></td></tr>';
+      h+='<td class="r"><span class="an-num'+(cd.plan===0?' zero':'')+'" style="color:var(--ink3);">'+cd.plan+'</span></td>'+anPctTd(cd.total,cd.plan)+'</tr>';
     });
     idx++;
   });
@@ -3827,6 +3828,12 @@ function toggleAnDetail(idx){
 }
 
 // ─── ЧИСЛЕННОСТЬ ──────────────────────────────────────────────────
+// Процент готовности = Факт / Итого (2026-10-06). Округление вниз — 100% только когда сделано всё; 100% — зелёным
+function anPctTd(done,plan){
+  if(!plan) return '<td class="r"><span class="an-num zero">—</span></td>';
+  var full=done>=plan, p=full?100:Math.floor(done/plan*100);
+  return '<td class="r"><span class="an-num'+(full?' an-pct-full':(p===0?' zero':''))+'">'+p+'%</span></td>';
+}
 function loadStaffing(cb){
   if(STAFFING_DATA.length>0){if(cb)cb();return;}
   gasFetch(BASE+'?action=getStaffing')
