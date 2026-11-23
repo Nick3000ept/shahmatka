@@ -3294,7 +3294,7 @@ function expStamp(){
   var p2=function(n){return n<10?'0'+n:String(n);};
   return p2(d.getDate())+'.'+p2(d.getMonth()+1)+'.'+d.getFullYear();
 }
-function buildExportTable(){
+function buildExportTable(useViewerText){
   if(FLOOR_READINESS) return null; // режим «Готовность этажей» не экспортируем
   var board=document.getElementById('board');
   if(!board||board.style.display==='none') return null; // «Нет строк по фильтру»
@@ -3349,12 +3349,18 @@ function buildExportTable(){
       if(!row){ h+='<td style="border:1px solid #94a3b8;background:'+EXP_ST_COLORS['s-nodata']+';"></td>'; return; }
       var mod=MOD[row.rowId];
       var s=mod&&mod.status!==undefined?mod.status:(S2CSS[row.status||'']||'s-empty');
-      // в ячейке — только дата (без процентов, решение пользователя 2026-08-12)
+      var cellStyle='border:1px solid #94a3b8;background:'+(EXP_ST_COLORS[s]||'#ffffff')+';text-align:center;padding:2px 3px;';
+      if(useViewerText){
+        var viewerText=CELL_MAP.get(String(row.rowId))?.querySelector('.ci')?.innerText.trim()||'';
+        h+='<td style="'+cellStyle+'font-size:12px;"><div style="width:120px;margin:0 auto;white-space:normal;overflow-wrap:anywhere;">'+e(viewerText)+'</div></td>';
+        return;
+      }
+      // Excel: только дата (без процентов, решение пользователя 2026-08-12)
       var dateEnd=mod&&mod.dateEnd!==undefined?mod.dateEnd:(row.dateEnd||'');
       var d=row.currentDate||dateEnd||row.baseDate||'';
       var dLbl='';
       if(d){ var dp=fmtDate(d).split('.'); dLbl=dp[0]+'.'+dp[1]; }
-      h+='<td style="border:1px solid #94a3b8;background:'+(EXP_ST_COLORS[s]||'#ffffff')+';font-size:16px;text-align:center;padding:2px 3px;white-space:nowrap;">'+e(dLbl)+'</td>';
+      h+='<td style="'+cellStyle+'font-size:16px;white-space:nowrap;">'+e(dLbl)+'</td>';
     });
     h+='</tr>';
   });
@@ -3392,7 +3398,7 @@ function exportExcel(){
 // Таблица целиком (все этажи и колонки) масштабируется под один лист —
 // перед печатью меряем её размер и подбираем масштаб (zoom).
 function exportPdf(){
-  var t=buildExportTable();
+  var t=buildExportTable(true);
   if(!t){ toast('Нет строк для экспорта — проверьте фильтры','inf'); return; }
   var st=document.createElement('style');
   st.id='exp-print-style';
