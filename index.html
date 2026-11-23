@@ -3294,11 +3294,12 @@ function expStamp(){
   var p2=function(n){return n<10?'0'+n:String(n);};
   return p2(d.getDate())+'.'+p2(d.getMonth()+1)+'.'+d.getFullYear();
 }
-function buildExportTable(useViewerText){
+function buildExportTable(forPdf){
   if(FLOOR_READINESS) return null; // режим «Готовность этажей» не экспортируем
   var board=document.getElementById('board');
   if(!board||board.style.display==='none') return null; // «Нет строк по фильтру»
   if(!VISIBLE_ROWS.length||!COL_KEYS.length||!FLOOR_LIST.length) return null;
+  var useViewerText=forPdf&&(SHOW_SP||SHOW_VOL||SHOW_CL||SHOW_FLATS);
   var cols=COL_KEYS, floors=FLOOR_LIST;
   var idx={};
   VISIBLE_ROWS.forEach(function(r){
@@ -3355,9 +3356,9 @@ function buildExportTable(useViewerText){
         h+='<td style="'+cellStyle+'font-size:12px;"><div style="width:120px;margin:0 auto;white-space:normal;overflow-wrap:anywhere;">'+e(viewerText)+'</div></td>';
         return;
       }
-      // Excel: только дата (без процентов, решение пользователя 2026-08-12)
       var dateEnd=mod&&mod.dateEnd!==undefined?mod.dateEnd:(row.dateEnd||'');
-      var d=row.currentDate||dateEnd||row.baseDate||'';
+      // В PDF в режиме сроков нужна только дата текущего окончания.
+      var d=forPdf?row.currentDate:(row.currentDate||dateEnd||row.baseDate);
       var dLbl='';
       if(d){ var dp=fmtDate(d).split('.'); dLbl=dp[0]+'.'+dp[1]; }
       h+='<td style="'+cellStyle+'font-size:16px;white-space:nowrap;">'+e(dLbl)+'</td>';
