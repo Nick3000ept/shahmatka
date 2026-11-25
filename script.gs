@@ -708,33 +708,40 @@ function getCheckLists() {
 // КВАРТИРЫ (лист «Квартиры», 2026-08-04) — счётчики квартир по уровню отделки.
 // Столбцы: A=Корпус (число) | B=Этаж (число) | C=Номер квартиры | D=Корпус (текст) |
 // E=Площадь | F=Статус (MR Base / Shell and Core + стяжка / Shell and Core).
-// Ответ: { flats: { 'К1': { '46': [mrBase, shellСтяжка, shell] } } } — только агрегат.
-// Статусы сверяются по вхождению без регистра — устойчиво к вариантам написания.
+// Счётчики отделки, этажи только с Shell and Core и названия работ MR Base.
 // ═══════════════════════════════════════════════════════════════════
 function getFlats() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName('Квартиры');
-  if (!sh) return {flats: {}};
-  var lastRow = sh.getLastRow();
-  if (lastRow < 2) return {flats: {}};
-  var vals = sh.getRange(2, 1, lastRow - 1, 6).getValues();
+  var lastRow = sh ? sh.getLastRow() : 0;
+  var vals = lastRow > 1 ? sh.getRange(2, 1, lastRow - 1, 6).getValues() : [];
   var out = {};
+  var shellOnlyFloors = {};
   vals.forEach(function (r) {
     var corp = parseInt(r[0], 10);
-    var floor = parseFloat(r[1]);
+    var floor = parseFloor(r[1]);
     var st = String(r[5]).trim().toLowerCase();
-    if (!corp || isNaN(floor) || !st) return;
+    if (!corp || typeof floor !== 'number') return;
+    var key = 'К' + corp;
+    if (String(r[2]).trim()) {
+      if (!shellOnlyFloors[key]) shellOnlyFloors[key] = {};
+      var isShell = /^shell\s+and\s+core(?:\s*\+\s*стяжка)?$/.test(st);
+      shellOnlyFloors[key][floor] = shellOnlyFloors[key][floor] !== false && isShell;
+    }
     var cat;
     if (st.indexOf('mr base') >= 0) cat = 0;                                 // серый
     else if (st.indexOf('shell') >= 0 && st.indexOf('стяж') >= 0) cat = 1;   // фиолетовый
     else if (st.indexOf('shell') >= 0) cat = 2;                              // красный
     else return;                                                             // прочие статусы не считаем
-    var key = 'К' + corp;
     if (!out[key]) out[key] = {};
     if (!out[key][floor]) out[key][floor] = [0, 0, 0];
     out[key][floor][cat]++;
   });
-  return {flats: out};
+  var dict = getWorkDict();
+  var mrBaseWorks = Object.keys(dict).filter(function (work) {
+    return /^mr\s+base$/i.test(dict[work].kp);
+  });
+  return {flats: out, shellOnlyFloors: shellOnlyFloors, mrBaseWorks: mrBaseWorks};
 }
 
 // ═══════════════════════════════════════════════════════════════════

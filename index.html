@@ -337,6 +337,7 @@ td.cell.s-remarks {background:#fee2e2;}
 td.cell.s-empty   {background:#ffffff;}
 /* Нет данных для этажа — тёмно-серый, неактивный */
 td.cell.s-nodata  {background:#c2c7d0;cursor:default;pointer-events:none;}
+.mr-base-cross{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;stroke:var(--ink3);}
 
 /* Левый акцент — убран как избыточный */
 
@@ -1003,6 +1004,7 @@ var ROWS_MAP = new Map();    // rowId → row object, перестраивает
 
 var FC=new Set(), FO='', FW=new Set(), FM='', FL1='', FL2='', FKP=false, FSTATUS=new Set(), SHOW_SP=false, FDATE='', FMOD=false, FLOOR_READINESS=false, SHOW_VOL=false, FPLAN7=false, FPLAN30=false, FOVERDUE=false, FPROTOCOL=false, SHOW_CL=false, SHOW_EMPTY=false;
 var SHOW_FLATS=false, FLATS=null; // чекбокс «Квартиры»: счётчики по отделке из листа «Квартиры» (null = ещё не загружены)
+var FLATS_REQUEST=null, SHELL_ONLY_FLOORS={}, MR_BASE_WORKS=new Set();
 var CHECK_LISTS=[], CL_MAP={};
 var WORKS=[];
 
@@ -1303,6 +1305,7 @@ async function loadData(){
     buildFilters();render();
     setSt('ok','Загружено · '+new Date().toLocaleTimeString('ru')+' · '+ROWS.length+' строк'+syncedLabel(DATA_SYNCED_AT));
     toast('Загружено '+ROWS.length+' строк','ok');
+    fetchFlats().then(render,function(){});
   }catch(ex){
     var msg=ex.message==='HTML_RESPONSE'?'Скрипт вернул HTML — попробуйте обновить страницу':ex.message;
     setSt('err',msg);toast('Ошибка: '+msg,'err',5000);
@@ -2077,12 +2080,14 @@ function render(){
           +(rightFact?'<div style="position:absolute;top:1px;right:2px;font-size:8px;line-height:1;opacity:.75;">📌</div>':'');
       }
 
-      h+='<td class="cell '+s+(isNewC?' gs':isNewP?' gp':'')+(isMod?' modified':'')+(isSel?' sel':'')+(isFloorSep?' floor-sep':'')+(isNotMine?' not-mine':'')+'" data-rid="'+e(rowId)+'" onclick="cellClick(event,\''+e(rowId)+'\')">'
+      var crossed=isMrBaseExcluded(row,MR_BASE_WORKS,SHELL_ONLY_FLOORS);
+      h+='<td class="cell '+s+(isNewC?' gs':isNewP?' gp':'')+(isMod?' modified':'')+(isSel?' sel':'')+(isFloorSep?' floor-sep':'')+(isNotMine?' not-mine':'')+'" data-rid="'+e(rowId)+'" onclick="cellClick(event,\''+e(rowId)+'\')"'+(crossed?' title="Работа для MR Base. На этаже только Shell and Core."':'')+'>'
         +'<div class="ci">'
         +'<div class="c-row">'+cellContent+'</div>'
         +(!SHOW_SP&&!SHOW_CL&&!SHOW_FLATS?diffHtml:'')
         +'</div>'
         +(pctNum>0&&!SHOW_CL&&!SHOW_FLATS?'<div class="c-bar"><div class="c-bar-fill" style="width:'+pctNum+'%"></div></div>':'')
+        +(crossed?'<svg class="mr-base-cross" aria-hidden="true"><line x1="0" y1="0" x2="100%" y2="100%"/><line x1="100%" y1="0" x2="0" y2="100%"/></svg>':'')
         +'</td>';
     });
     h+='</tr>';
@@ -3661,8 +3666,8 @@ function setAnUnit(u){
   AN_UNIT=u;
   if(u==='kv'&&!FLATS){
     // лист «Квартиры» ещё не загружен — тянем и перерисовываем
-    fetchJson(BASE+'?action=getFlats&t='+Date.now())
-      .then(function(j){FLATS=j.flats||{};renderAnalytics();})
+    fetchFlats()
+      .then(render)
       .catch(function(){toast('Ошибка загрузки квартир','err');AN_UNIT='fl';renderAnalytics();});
   }
   renderAnalytics();
@@ -3928,13 +3933,30 @@ function togglePvDetail(idx){
 
 // ─── КВАРТИРЫ ─────────────────────────────────────────────────────
 // Чекбокс «Квартиры»: счётчики по отделке из листа «Квартиры».
-// Грузится лениво при первом включении, дальше — из памяти страницы.
+// Общий запрос для шахматки, счётчиков и аналитики.
+function fetchFlats(){
+  if(!FLATS_REQUEST){
+    FLATS_REQUEST=fetchJson(BASE+'?action=getFlats&t='+Date.now())
+      .then(function(j){
+        if(!j.flats) throw new Error(j.error||'Нет данных по квартирам');
+        FLATS=j.flats;
+        SHELL_ONLY_FLOORS=j.shellOnlyFloors||{};
+        MR_BASE_WORKS=new Set(j.mrBaseWorks||[]);
+      })
+      .finally(function(){FLATS_REQUEST=null;});
+  }
+  return FLATS_REQUEST;
+}
+
+function isMrBaseExcluded(row,works,floors){
+  return works.has(row.work) && !!floors[row.corpus] && floors[row.corpus][row.floor]===true;
+}
+
 async function loadFlats(){
   if(FLATS){render();return;}
   setSt('spin','Загрузка квартир…');
   try{
-    var j=await fetchJson(BASE+'?action=getFlats&t='+Date.now());
-    FLATS=j.flats||{};
+    await fetchFlats();
     setSt('ok','');
     render();
   }catch(ex){

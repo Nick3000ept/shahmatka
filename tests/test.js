@@ -431,7 +431,7 @@ atest('портал: ответ Google как есть (не-JSON «OK») отд
 
 // ── Бэк: getRowsByIds отдаёт ровно те строки, что getRows (script.gs в песочнице с поддельной таблицей) ──
 const GS = fs.readFileSync(path.join(__dirname, '..', 'script.gs'), 'utf8');
-function gasSandbox(values, factRows) {
+function gasSandbox(values, factRows, flats) {
   const reads = [];
   const mkSheet = (name, rows, cols) => ({
     getName: () => name,
@@ -447,7 +447,9 @@ function gasSandbox(values, factRows) {
     } })
   });
   const main = mkSheet('СБ3_ОБЩАЯ', values), fact = mkSheet('Факт_работы', factRows);
-  const ss = { getSheetByName: n => (n === 'СБ3_ОБЩАЯ' ? main : n === 'Факт_работы' ? fact : null), getSheets: () => [main, fact] };
+  const sheets = { 'СБ3_ОБЩАЯ': main, 'Факт_работы': fact };
+  if (flats) sheets['Квартиры'] = mkSheet('Квартиры', flats);
+  const ss = { getSheetByName: n => sheets[n] || null, getSheets: () => [main, fact] };
   const ctx = vm.createContext({ Date, JSON, Math, String, Array, Object, parseFloat, parseInt, isNaN, console,
     SpreadsheetApp: { getActiveSpreadsheet: () => ss },
     CacheService: { getScriptCache: () => ({ get: () => null, put: () => {}, remove: () => {} }) } });
@@ -465,6 +467,34 @@ function sheetValues(n) {
   return rows;
 }
 const FACT = [['', '', 'Штукатурка', 'Этаж', 'Отделка', 'Стены', '', '', '', 'да', '3'], ['', '', 'Стяжка', 'МОП', 'Полы', 'Стяжка', '', '', '', '', '1']];
+
+section('MR Base — крест на ячейке');
+test('только работы MR Base и этажи, где у всех квартир отделка Shell and Core', () => {
+  const facts = [['', '', 'Штукатурка', '', '', '', '', '', '', ' MR Base '], FACT[1]];
+  const apartments = [
+    [1, '2,5', '101', '', '', 'Shell and Core'],
+    [1, '2,5', '102', '', '', 'Shell and Core + стяжка'],
+    [1, '2,5', '', '', '', ''],
+    [2, '2,5', '201', '', '', 'MR Base'],
+    [1, 3, '301', '', '', 'Shell and Core'],
+    [1, 3, '302', '', '', 'MR Base'],
+    [1, 4, '401', '', '', 'Shell and Core'],
+    [1, 4, '402', '', '', ''],
+    [1, 5, '501', '', '', 'Shell and Core'],
+    [1, 5, '502', '', '', 'Не определено'],
+  ];
+  const { ctx } = gasSandbox([], facts, apartments);
+  const { flats, shellOnlyFloors, mrBaseWorks } = JSON.parse(JSON.stringify(ctx.getFlats()));
+  assert.deepStrictEqual(flats['К1']['2.5'], [0, 1, 1]);
+  assert.deepStrictEqual(mrBaseWorks, ['Штукатурка']);
+  const excluded = vm.runInNewContext(pageFunction('isMrBaseExcluded') + '\nisMrBaseExcluded');
+  const isCrossed = (corpus, floor, work = 'Штукатурка') =>
+    excluded({ corpus, floor, work }, new Set(mrBaseWorks), shellOnlyFloors);
+  assert.strictEqual(isCrossed('К1', 2.5), true);
+  for (const floor of [3, 4, 5, 6]) assert.strictEqual(isCrossed('К1', floor), false);
+  assert.strictEqual(isCrossed('К2', 2.5), false);
+  assert.strictEqual(isCrossed('К1', 2.5, 'Стяжка'), false);
+});
 
 section('script.gs getRowsByIds ↔ getRows');
 test('те же строки, колонки, обогащение и порядок; синтетические row_N, дубли rowId, пропуски', () => {
